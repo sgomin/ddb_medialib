@@ -11,6 +11,7 @@ namespace fs = boost::filesystem;
 const char * const DB_MAIN_FILENAME = "main.db";
 const char * const DB_FILE_FILENAME = "filename.db";
 const char * const DB_PARENID_FILENAME = "parentid.db";
+const char FILENAME_DELIMITER = ':';
 
 //namespace boost {
 //namespace serialization {
@@ -47,7 +48,7 @@ void Database::open(const std::string& path)
 		/*database*/nullptr, DB_HEAP, DB_CREATE, /*mode*/0);
 	dbFilename_.open(/*txnid*/nullptr, DB_FILE_FILENAME, 
 		/*database*/nullptr, DB_BTREE, DB_CREATE, /*mode*/0);
-	dbParentId_.set_flags(DB_DUPSORT);
+	dbParentId_.set_flags(DB_DUP | DB_DUPSORT);
 	dbParentId_.open(/*txnid*/nullptr, DB_PARENID_FILENAME, 
 		/*database*/nullptr, DB_BTREE, DB_CREATE, /*mode*/0);
 	dbMain_.associate(/*txnid*/nullptr, &dbFilename_, &getFileName, /*flags*/0);
@@ -138,14 +139,43 @@ int Database::getFileName(
 	assert(pdata);
 	assert(skey);
 	
-	std::istrstream strm(
-		static_cast<const char*>(pdata->get_data()), pdata->get_size());
-
-	Record::Header header;
-	strm >> header;
+	const char * const pData = static_cast<const char*>(pdata->get_data());
+	const char * const pDataEnd = pData + pdata->get_size();
 	
-	skey->set_data(const_cast<char*>(header.fileName.data()));
-    skey->set_size(header.fileName.size());
+	int cnt = 0;
+	const char * pFilename = std::find_if(pData, pDataEnd, [&cnt](char c)->bool
+	{
+		if (c == ' ')
+		{
+			++cnt;
+			
+			if (cnt == 3)
+			{
+				return true;
+			}
+		}
+		
+		return false;
+	});
+	
+	if (pFilename == pDataEnd || pFilename + 1 == pDataEnd)
+	{
+		return -1;
+	}
+	
+	++pFilename;
+	
+	const char * const pFilenameEnd = std::find(pFilename, pDataEnd, FILENAME_DELIMITER);
+	
+	if (pFilenameEnd == pDataEnd)
+	{
+		return -1;
+	}
+	
+	const size_t fileNameSize = pFilenameEnd - pFilename;
+	
+	skey->set_data(const_cast<char*>(pFilename));
+    skey->set_size(fileNameSize);
 	
 	return 0;
 }
@@ -159,12 +189,16 @@ int Database::getParentId(
 	
 	std::istrstream strm(
 		static_cast<const char*>(pdata->get_data()), pdata->get_size());
-
-	RecordID parentID;
+	
+	RecordID  parentID;
 	strm >> parentID;
 	
-	skey->set_data(parentID.data());
+	void * pMem = malloc(parentID.size());
+	memcpy(pMem, parentID.data(), parentID.size());
+	
+	skey->set_data(pMem);
     skey->set_size(parentID.size());
+	skey->set_flags(DB_DBT_APPMALLOC);
 	
 	return 0;
 }
@@ -180,8 +214,6 @@ std::ostream& operator<< (std::ostream& strm, const RecordID& recordID)
 	return strm << *reinterpret_cast<const db_pgno_t*>(recordID.data()) << ' '
 		<< *reinterpret_cast<const db_indx_t*>(recordID.data() + sizeof(db_pgno_t));
 }
-
-const char FILENAME_DELIMITER = ':';
 
 std::istream& operator>> (std::istream& strm, Record::Header& header)
 {
