@@ -55,7 +55,7 @@ void Database::open(const std::string& path)
 	dbMain_.associate(/*txnid*/nullptr, &dbParentId_, &getParentId, /*flags*/0);
 }
 
-Record Database::get(const RecordID& id) const
+RecordData Database::get(const RecordID& id) const
 {
 	Dbt key(id.data(), id.size());
 	Dbt data;
@@ -63,10 +63,10 @@ Record Database::get(const RecordID& id) const
 	const int err = dbMain_.get(/*txnid*/nullptr, &key, &data, /*flags*/0);
 	assert (err == 0);
 	
-	return Record(data);
+	return RecordData(data);
 }
 
-RecordID Database::add(const Record& record)
+RecordID Database::add(const RecordData& record)
 {
 	Dbt key;
 	const std::string str = record.data();
@@ -78,7 +78,7 @@ RecordID Database::add(const Record& record)
 	return RecordID(key);
 }
 
-void Database::replace(const RecordID& id, const Record& record)
+void Database::replace(const RecordID& id, const RecordData& record)
 {
 	Dbt key(id.data(), id.size());
 	const std::string str = record.data();
@@ -87,9 +87,9 @@ void Database::replace(const RecordID& id, const Record& record)
 	dbMain_.put(nullptr, &key, &data, DB_APPEND);
 }
 
-IDRecordPairs Database::children(const RecordID& idParent) const
+Records Database::children(const RecordID& idParent) const
 {
-	IDRecordPairs result;
+	Records result;
 	
 	Dbc* pCursor = nullptr;
 	dbParentId_.cursor(NULL, &pCursor, 0);
@@ -103,7 +103,7 @@ IDRecordPairs Database::children(const RecordID& idParent) const
 	
 	while (res == 0)
 	{
-		result.push_back(std::make_pair(RecordID(keyChild), Record(record)));
+		result.push_back(std::make_pair(RecordID(keyChild), RecordData(record)));
 		res = pCursor->pget(&keyParent, &keyChild, &record, DB_NEXT_DUP);
 	}
 	
@@ -111,7 +111,7 @@ IDRecordPairs Database::children(const RecordID& idParent) const
 	return result;
 }
 
-boost::optional<IDRecordPair> Database::find(const std::string& fileName) const
+Record Database::find(const std::string& fileName) const
 {
 	Dbt key;
 	Dbt data;
@@ -121,7 +121,7 @@ boost::optional<IDRecordPair> Database::find(const std::string& fileName) const
 	
 	if (err == DB_NOTFOUND)
 	{
-		return boost::optional<IDRecordPair>();
+		return make_Record(RecordID(), RecordData());
 	}
 	
 	if (err)
@@ -129,7 +129,7 @@ boost::optional<IDRecordPair> Database::find(const std::string& fileName) const
 		throw DbException("Failed to obtain record by filename key", err);
 	}
 	
-	return std::make_pair(RecordID(key), Record(data));
+	return make_Record(RecordID(key), RecordData(data));
 }
 
 //static 
@@ -215,14 +215,14 @@ std::ostream& operator<< (std::ostream& strm, const RecordID& recordID)
 		<< *reinterpret_cast<const db_indx_t*>(recordID.data() + sizeof(db_pgno_t));
 }
 
-std::istream& operator>> (std::istream& strm, Record::Header& header)
+std::istream& operator>> (std::istream& strm, RecordData::Header& header)
 {
 	char delim;
 	strm >> header.parentID >> header.lastWriteTime >> std::ws;
 	return std::getline(strm, header.fileName, FILENAME_DELIMITER).get(delim);
 }
 
-std::ostream& operator<< (std::ostream& strm, const Record::Header& header)
+std::ostream& operator<< (std::ostream& strm, const RecordData::Header& header)
 {
 	return strm << header.parentID << ' ' 
 				<< header.lastWriteTime << ' ' 
@@ -240,12 +240,12 @@ RecordID::RecordID(const Dbt& dbRec)
 	memcpy(data_.data(), dbRec.get_data(), dbRec.get_size());
 }
 
-Record::Record() :
+RecordData::RecordData() :
 	header()
 {
 }
     
-Record::Record(const Dbt& dbRec)
+RecordData::RecordData(const Dbt& dbRec)
 {
 	std::istrstream strm(
 		static_cast<const char*>(dbRec.get_data()), dbRec.get_size());
@@ -253,7 +253,16 @@ Record::Record(const Dbt& dbRec)
 	strm >> header;
 }
 
-std::string Record::data() const
+RecordData::RecordData(const RecordID& parentID, 
+					   time_t lastWriteTime, 
+					   const std::string& fileName)
+{
+	header.parentID = parentID;
+	header.lastWriteTime = lastWriteTime;
+	header.fileName = fileName;
+}
+
+std::string RecordData::data() const
 {
 	std::ostringstream strm;
 	

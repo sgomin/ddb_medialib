@@ -1,10 +1,9 @@
 #ifndef DATABASE_HPP
 #define	DATABASE_HPP
 
-#include <boost/optional.hpp>
-
 #include <iosfwd>
 #include <array>
+#include <vector>
 
 #include <db_cxx.h>
 
@@ -22,10 +21,16 @@ private:
     DataT data_;
 };
 
-struct Record
+struct RecordData
 {
-    Record();
-    explicit Record(const Dbt& dbRec);
+    RecordData();
+    RecordData(RecordData&& other) = default;
+    explicit RecordData(const Dbt& dbRec);
+    RecordData(const RecordID& parentID, 
+               time_t lastWriteTime, 
+               const std::string& fileName);
+    
+    RecordData& operator=(RecordData&& other) = default;
     
     std::string data() const;
     
@@ -37,25 +42,33 @@ struct Record
     } header;
 };
 
-typedef std::pair<RecordID, Record> IDRecordPair;
-typedef std::vector<IDRecordPair> IDRecordPairs;
+typedef std::pair<RecordID, RecordData> Record;
+
+inline Record make_Record(RecordID&& id, RecordData&& data)
+{
+    return std::make_pair(std::move(id), std::move(data));
+}
+
+typedef std::vector<Record> Records;
 
 std::istream& operator>> (std::istream& strm, RecordID& recordID);
 std::ostream& operator<< (std::ostream& strm, const RecordID& recordID);
-std::istream& operator>> (std::istream& strm, Record::Header& header);
-std::ostream& operator<< (std::ostream& strm, const Record::Header& header);
+std::istream& operator>> (std::istream& strm, RecordData::Header& header);
+std::ostream& operator<< (std::ostream& strm, const RecordData::Header& header);
 
 class Database
 {
 public:
     Database();
     
-    void            open(const std::string& path);
-    Record          get(const RecordID& id) const;
-    RecordID        add(const Record& record);
-    void            replace(const RecordID& id, const Record& record);
-    IDRecordPairs   children(const RecordID& idParent) const;
-    boost::optional<IDRecordPair> find(const std::string& fileName) const;
+    /// Opens database at given directory, creates if doesn't exist 
+    void        open(const std::string& path);
+    
+    RecordData  get(const RecordID& id) const;
+    RecordID    add(const RecordData& record);
+    void        replace(const RecordID& id, const RecordData& record);
+    Records     children(const RecordID& idParent) const;
+    Record      find(const std::string& fileName) const;
     
 private:
     static int getFileName(
@@ -63,7 +76,7 @@ private:
     static int getParentId(
         Db* sdbp, const Dbt* pkey, const Dbt* pdata, Dbt* skey);
     
-    static std::string convert(const Record& record);
+    static std::string convert(const RecordData& record);
 
 private:
     DbEnv       env_;

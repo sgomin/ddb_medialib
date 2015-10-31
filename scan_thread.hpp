@@ -18,12 +18,19 @@ public:
     void operator() ();
 
 private:
-    void scanDir(const fs::path& path, const RecordID& parentID, bool recursive);
-    void scanFile(const fs::path& path, const RecordID& parentID);
+    template<typename EntriesIt>
+    void scanDir(
+            const RecordID& dirId, 
+            EntriesIt itEntriesBegin, 
+            EntriesIt itEntriesEnd,
+            bool recursive);
     
-    RecordID addDir(const fs::path& path, const RecordID& parentID);
-    RecordID addFile(const fs::path& path, const RecordID& parentID, time_t lastWriteTime);
-    void updateFile(const RecordID& id, Record& record);
+    void scanEntry(
+            const fs::path& path, 
+            const RecordID& parentID, 
+            const Records& oldRecords,
+            bool recursive);
+    
     
     const Settings::Directories dirs_;
     Database&                   db_;

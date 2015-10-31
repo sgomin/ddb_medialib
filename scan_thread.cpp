@@ -18,7 +18,59 @@ ScanThread::~ScanThread()
 {
 	
 }
-    
+
+namespace {
+	
+const fs::path& getPath(const fs::directory_entry& dirEntry)
+{
+	return dirEntry.path();
+}
+
+fs::path getPath(const Settings::Directories::value_type& dirEntry)
+{
+	return dirEntry.first;
+}
+	
+bool isRecursive(const fs::directory_entry& dirEntry)
+{
+	return true;
+}
+
+bool isRecursive(const Settings::Directories::value_type& dirEntry)
+{
+	return dirEntry.second.recursive;
+}
+
+struct CmpByPath
+{
+	bool operator() (const Record& left, const Record& right) const
+	{
+		return left.second.header.fileName < right.second.header.fileName;
+	}
+};
+
+}
+
+
+template<typename EntriesIt>
+void ScanThread::scanDir(
+            const RecordID& dirId, 
+            EntriesIt itEntriesBegin, 
+            EntriesIt itEntriesEnd,
+            bool recursive)
+{
+	Records oldRecords = db_.children(dirId);
+	std::sort(oldRecords.begin(), oldRecords.end(), CmpByPath());
+		
+	auto entriesRange = boost::make_iterator_range(itEntriesBegin, itEntriesEnd);
+	
+	for (const auto& entry : entriesRange)
+	{
+		scanEntry(getPath(entry), dirId, oldRecords, isRecursive(entry));
+	}
+}
+
+
 void ScanThread::operator() ()
 try
 {
@@ -26,19 +78,10 @@ try
 //	{
 		changed_ = false;
 		
-		for (const std::pair<std::string, Settings::Directory>& dir : dirs_)
-		{
-			const fs::path path = dir.first;
-
-			if (fs::is_directory(path))
-			{
-				scanDir(path, RecordID(), dir.second.recursive);
-			}
-			else
-			{
-				scanFile(path, RecordID());
-			}
-		}
+		scanDir(RecordID(), 
+				dirs_.cbegin(), 
+				dirs_.cend(), 
+				/*recursive*/ true);
 		
 		if (!changed_)
 		{
@@ -60,84 +103,46 @@ catch(...)
 	std::cerr << "Unexpected error in the file scan thread: " << std::endl;
 }
 
-void ScanThread::scanDir(const fs::path& path, const RecordID& parentID, bool recursive)
+void ScanThread::scanEntry(
+			const fs::path& path, 
+			const RecordID& parentID, 
+			const Records& oldRecords,
+			bool recursive)
 try
 {
-	assert(fs::is_directory(path));
-	
-	boost::optional<IDRecordPair> pRec = db_.find(path.string());
-	const RecordID dirId = pRec ? pRec->first : addDir(path, parentID);
-	
-	IDRecordPairs children = db_.children(dirId);
-	
-	auto entriesRange = boost::iterator_range<fs::directory_iterator>(
-		fs::directory_iterator(path), fs::directory_iterator());
-	
-	for (const fs::directory_entry& entry : entriesRange)
+	Record newRecord = make_Record(
+		RecordID(), 
+		RecordData(parentID, fs::last_write_time(path), path.string()));
+
+	const Records::const_iterator itOldRecord = std::lower_bound(
+		oldRecords.cbegin(), oldRecords.cend(), newRecord, CmpByPath());
+
+	if (fs::is_directory(path) && recursive)
 	{
-		if (fs::is_directory(entry))
-		{
-			if (recursive)
-			{
-				scanDir(entry, dirId, /*recursive*/true);
-			}
-			
-			continue;
-		}
-		
+		const RecordID entryId = itOldRecord != oldRecords.cend() ?
+			itOldRecord->first : db_.add(newRecord.second);
+
+		scanDir(entryId, 
+				fs::directory_iterator(path), 
+				fs::directory_iterator(), 
+				/*recursive*/ true);
+	}
+	else // file
+	{
 		// TODO: check extension
-		scanFile(entry, dirId);
+		if (itOldRecord == oldRecords.cend())
+		{
+			db_.add(newRecord.second);
+		}
+		else if(newRecord.second.header.lastWriteTime != 
+				itOldRecord->second.header.lastWriteTime)
+		{
+			db_.replace(itOldRecord->first, newRecord.second);
+		}
 	}
 }
 catch(const std::exception& ex)
 {
-	std::cerr << "Failed to process directory " 
+	std::cerr << "Failed to process filesystem element " 
 			<< path << ": " << ex.what() << std::endl;
-}
-
-void ScanThread::scanFile(const fs::path& path, const RecordID& parentID)
-try
-{
-	const time_t lastWriteTime = fs::last_write_time(path);
-	
-	boost::optional<IDRecordPair> pRec = db_.find(path.string());
-	assert(!pRec || pRec->second.header.fileName == path.string());
-	
-	if (!pRec)
-	{
-		addFile(path, parentID, lastWriteTime);
-		changed_ = true;
-	}
-	else if (pRec->second.header.lastWriteTime != lastWriteTime)
-	{
-		pRec->second.header.lastWriteTime = lastWriteTime;
-		updateFile(pRec->first, pRec->second);
-		changed_ = true;
-	}
-}
-catch(const std::exception& ex)
-{
-	std::cerr << "Failed to process file " 
-			<< path << ": " << ex.what() << std::endl;
-}
-
-RecordID ScanThread::addDir(const fs::path& path, const RecordID& parentID)
-{
-	return addFile(path, parentID, 0);
-}
-
-RecordID ScanThread::addFile(
-		const fs::path& path, const RecordID& parentID, time_t lastWriteTime)
-{
-	Record record;
-	record.header.fileName = path.string();
-	record.header.parentID = parentID;
-	record.header.lastWriteTime = lastWriteTime;
-	
-	return db_.add(record);
-}
-
-void ScanThread::updateFile(const RecordID& id, Record& record)
-{
-	db_.replace(id, record);
 }
