@@ -78,6 +78,38 @@ RecordID Database::add(const RecordData& record)
 	return RecordID(key);
 }
 
+void Database::del(const RecordID& id)
+{
+	Dbt key(id.data(), id.size());
+	// fetch children
+	std::vector<RecordID> childrenIds;
+	Dbc* pCursor = nullptr;
+	dbParentId_.cursor(NULL, &pCursor, 0);
+	assert(pCursor);
+	
+	Dbt keyChild;
+	Dbt record;
+	
+	int res = pCursor->pget(&key, &keyChild, &record, DB_SET);
+	
+	while (res == 0)
+	{
+		childrenIds.push_back(RecordID(keyChild));
+		res = pCursor->pget(&key, &keyChild, &record, DB_NEXT_DUP);
+	}
+	
+	pCursor->close();
+	
+	// delete children
+	for (const RecordID& childId : childrenIds)
+	{
+		del(childId);
+	}
+	
+	// delete the record itself
+	dbMain_.del(nullptr, &key, /*flags*/0);
+}
+
 void Database::replace(const RecordID& id, const RecordData& record)
 {
 	Dbt key(id.data(), id.size());
@@ -103,7 +135,7 @@ Records Database::children(const RecordID& idParent) const
 	
 	while (res == 0)
 	{
-		result.push_back(std::make_pair(RecordID(keyChild), RecordData(record)));
+		result.push_back(make_Record(RecordID(keyChild), RecordData(record)));
 		res = pCursor->pget(&keyParent, &keyChild, &record, DB_NEXT_DUP);
 	}
 	

@@ -68,6 +68,11 @@ void ScanThread::scanDir(
 	{
 		scanEntry(getPath(entry), dirId, oldRecords, isRecursive(entry));
 	}
+	
+	for (const Record& missing : oldRecords)
+	{
+		db_.del(missing.first);
+	}
 }
 
 
@@ -106,7 +111,7 @@ catch(...)
 void ScanThread::scanEntry(
 			const fs::path& path, 
 			const RecordID& parentID, 
-			const Records& oldRecords,
+			Records& oldRecords,
 			bool recursive)
 try
 {
@@ -114,8 +119,8 @@ try
 		RecordID(), 
 		RecordData(parentID, fs::last_write_time(path), path.string()));
 
-	const Records::const_iterator itOldRecord = std::lower_bound(
-		oldRecords.cbegin(), oldRecords.cend(), newRecord, CmpByPath());
+	const Records::iterator itOldRecord = std::lower_bound(
+		oldRecords.begin(), oldRecords.end(), newRecord, CmpByPath());
 
 	if (fs::is_directory(path) && recursive)
 	{
@@ -139,6 +144,11 @@ try
 		{
 			db_.replace(itOldRecord->first, newRecord.second);
 		}
+	}
+	
+	if (oldRecords.end() != itOldRecord)
+	{
+		oldRecords.erase(itOldRecord);
 	}
 }
 catch(const std::exception& ex)

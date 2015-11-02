@@ -28,7 +28,7 @@ private:
     void scanEntry(
             const fs::path& path, 
             const RecordID& parentID, 
-            const Records& oldRecords,
+            Records& oldRecords,
             bool recursive);
     
     

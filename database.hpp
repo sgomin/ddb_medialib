@@ -66,6 +66,7 @@ public:
     
     RecordData  get(const RecordID& id) const;
     RecordID    add(const RecordData& record);
+    void        del(const RecordID& id);
     void        replace(const RecordID& id, const RecordData& record);
     Records     children(const RecordID& idParent) const;
     Record      find(const std::string& fileName) const;
