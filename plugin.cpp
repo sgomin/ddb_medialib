@@ -16,7 +16,6 @@ namespace fs = boost::filesystem;
 #include <boost/foreach.hpp>
 
 #include <iostream>
-#include <thread>
 #include <memory.h>
 
 const std::string	CONFIG_FILENAME = "medialib";
@@ -45,7 +44,7 @@ private:
     const fs::path                      fnSettings_;
     Settings                            settings_;
 	Database							db_;
-	std::unique_ptr<std::thread>		pScanThread_;
+	std::unique_ptr<ScanThread>			pScanThread_;
 };
 
 std::unique_ptr<Plugin::Impl> Plugin::s_pImpl;
@@ -134,19 +133,14 @@ Plugin::Impl::Impl()
 	
 	const fs::path pathDb = fs::path(deadbeef->get_config_dir()) / DB_DIR;
 	db_.open(pathDb.string());
-	pScanThread_.reset(new std::thread(ScanThread(settings_.directories, db_)));
+	pScanThread_.reset(new ScanThread(settings_.directories, db_));
 }
 
 Plugin::Impl::~Impl()
 {
     try
     {
-		if (pScanThread_)
-		{
-			pScanThread_->join();
-		}
-		
-        storeSettings(std::move(settings_));
+		storeSettings(std::move(settings_));
     }
     catch(const std::exception & ex)
     {

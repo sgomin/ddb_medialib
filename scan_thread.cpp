@@ -8,15 +8,18 @@
 ScanThread::ScanThread(
 		const Settings::Directories& dirs,
 		Database& db)
- : dirs_(dirs)
+ : thread_(std::ref(*this))
+ , stop_(false)
+ , dirs_(dirs)
  , db_(db)
- , changed_(false)
 {
 }
     
 ScanThread::~ScanThread()
 {
-	
+	stop_ = true;
+	cond_.notify_all();
+	thread_.join();
 }
 
 namespace {
@@ -59,6 +62,11 @@ void ScanThread::scanDir(
             EntriesIt itEntriesEnd,
             bool recursive)
 {
+	if (stop_)
+	{
+		return;
+	}
+	
 	Records oldRecords = db_.children(dirId);
 	std::sort(oldRecords.begin(), oldRecords.end(), CmpByPath());
 		
@@ -76,6 +84,7 @@ void ScanThread::scanDir(
 		
 		if (!exists && ec.value() == ENOENT)
 		{
+			changed_ = true;
 			db_.del(missing.first);
 		}
 	}
@@ -88,6 +97,11 @@ void ScanThread::scanEntry(
 			bool recursive)
 try
 {
+	if (stop_)
+	{
+		return;
+	}
+	
 	Record newRecord = make_Record(
 		RecordID(), 
 		RecordData(parentID, fs::last_write_time(path), path.string()));
@@ -110,11 +124,13 @@ try
 		// TODO: check extension
 		if (itOldRecord == oldRecords.cend())
 		{
+			changed_ = true;
 			db_.add(newRecord.second);
 		}
 		else if(newRecord.second.header.lastWriteTime != 
 				itOldRecord->second.header.lastWriteTime)
 		{
+			changed_ = true;
 			db_.replace(itOldRecord->first, newRecord.second);
 		}
 	}
@@ -133,8 +149,8 @@ catch(const std::exception& ex)
 void ScanThread::operator() ()
 try
 {
-//	while (!stop_)
-//	{
+	while (!stop_)
+	{
 		changed_ = false;
 		
 		scanDir(RecordID(), 
@@ -142,15 +158,27 @@ try
 				dirs_.cend(), 
 				/*recursive*/ true);
 		
-		if (!changed_)
+		if (!changed_ && !stop_)
 		{
-			std::this_thread::sleep_for(std::chrono::milliseconds(100));
+			struct FackeLock 
+			{
+				void lock() {}
+				void unlock() {}
+			} fackeLock;
+			
+			cond_.wait_for(fackeLock, sleepTime_);
+			
+			if (sleepTime_ < std::chrono::seconds(2))
+			{
+				sleepTime_ += std::chrono::milliseconds(100);
+			}
 		}
 		else
 		{
+			sleepTime_ = std::chrono::milliseconds(100);
 			std::this_thread::yield();
 		}
-//	}
+	}
 }
 catch(const std::exception& ex)
 {
