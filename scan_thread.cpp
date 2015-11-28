@@ -71,41 +71,14 @@ void ScanThread::scanDir(
 	
 	for (const Record& missing : oldRecords)
 	{
-		db_.del(missing.first);
+		boost::system::error_code ec;
+		const bool exists = fs::exists(missing.second.header.fileName, ec);
+		
+		if (!exists && ec.value() == ENOENT)
+		{
+			db_.del(missing.first);
+		}
 	}
-}
-
-
-void ScanThread::operator() ()
-try
-{
-//	while (!stop_)
-//	{
-		changed_ = false;
-		
-		scanDir(RecordID(), 
-				dirs_.cbegin(), 
-				dirs_.cend(), 
-				/*recursive*/ true);
-		
-		if (!changed_)
-		{
-			std::this_thread::sleep_for(std::chrono::milliseconds(100));
-		}
-		else
-		{
-			std::this_thread::yield();
-		}
-//	}
-}
-catch(const std::exception& ex)
-{
-	std::cerr << "Error in the file scan thread: " 
-			<< ex.what() << std::endl;
-}
-catch(...)
-{
-	std::cerr << "Unexpected error in the file scan thread: " << std::endl;
 }
 
 void ScanThread::scanEntry(
@@ -155,4 +128,36 @@ catch(const std::exception& ex)
 {
 	std::cerr << "Failed to process filesystem element " 
 			<< path << ": " << ex.what() << std::endl;
+}
+
+void ScanThread::operator() ()
+try
+{
+//	while (!stop_)
+//	{
+		changed_ = false;
+		
+		scanDir(RecordID(), 
+				dirs_.cbegin(), 
+				dirs_.cend(), 
+				/*recursive*/ true);
+		
+		if (!changed_)
+		{
+			std::this_thread::sleep_for(std::chrono::milliseconds(100));
+		}
+		else
+		{
+			std::this_thread::yield();
+		}
+//	}
+}
+catch(const std::exception& ex)
+{
+	std::cerr << "Error in the file scan thread: " 
+			<< ex.what() << std::endl;
+}
+catch(...)
+{
+	std::cerr << "Unexpected error in the file scan thread: " << std::endl;
 }
