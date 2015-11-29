@@ -43,10 +43,11 @@ private:
     ddb_gtkui_t                     *   pGtkUi_;
     const fs::path                      fnSettings_;
     Settings                            settings_;
-	Database							db_;
+	static Database						db_;
 	std::unique_ptr<ScanThread>			pScanThread_;
 };
 
+Database Plugin::Impl::db_;
 std::unique_ptr<Plugin::Impl> Plugin::s_pImpl;
 
 //static 
@@ -138,9 +139,15 @@ Plugin::Impl::Impl()
 
 Plugin::Impl::~Impl()
 {
-    try
+	try
     {
+		db_.close();
 		storeSettings(std::move(settings_));
+    }
+	catch(const DbException & ex)
+    {
+        std::cerr << "[" PLUGIN_NAME " ] Failed to close database: " 
+                << ex.what() << std::endl;
     }
     catch(const std::exception & ex)
     {
@@ -189,7 +196,7 @@ ddb_gtkui_widget_t * Plugin::Impl::createWidget()
     ddb_gtkui_widget_t *w = 
             static_cast<ddb_gtkui_widget_t*>(malloc(sizeof(ddb_gtkui_widget_t)));
     memset(w, 0, sizeof (*w));
-    MainWidget * pMainWidget = new MainWidget();
+    MainWidget * pMainWidget = new MainWidget(db_);
     w->widget = GTK_WIDGET( pMainWidget->gobj() );
     w->destroy = &destroyWidget;
     return w;

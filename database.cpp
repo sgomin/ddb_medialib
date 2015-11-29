@@ -55,6 +55,13 @@ void Database::open(const std::string& path)
 	dbMain_.associate(/*txnid*/nullptr, &dbParentId_, &getParentId, /*flags*/0);
 }
 
+void Database::close()
+{
+	dbParentId_.close(0);
+	dbFilename_.close(0);
+	dbMain_.close(0);
+}
+
 RecordData Database::get(const RecordID& id) const
 {
 	Dbt key(id.data(), id.size());
@@ -153,7 +160,7 @@ Record Database::find(const std::string& fileName) const
 	
 	if (err == DB_NOTFOUND)
 	{
-		return make_Record(RecordID(), RecordData());
+		return make_Record(NULL_RECORD_ID, RecordData());
 	}
 	
 	if (err)
@@ -181,7 +188,7 @@ int Database::getFileName(
 		{
 			++cnt;
 			
-			if (cnt == 3)
+			if (cnt == 4)
 			{
 				return true;
 			}
@@ -250,14 +257,17 @@ std::ostream& operator<< (std::ostream& strm, const RecordID& recordID)
 std::istream& operator>> (std::istream& strm, RecordData::Header& header)
 {
 	char delim;
-	strm >> header.parentID >> header.lastWriteTime >> std::ws;
+	int isDir;
+	strm >> header.parentID >> header.lastWriteTime >> isDir >> std::ws;
+	header.isDir = !!isDir;
 	return std::getline(strm, header.fileName, FILENAME_DELIMITER).get(delim);
 }
 
 std::ostream& operator<< (std::ostream& strm, const RecordData::Header& header)
 {
 	return strm << header.parentID << ' ' 
-				<< header.lastWriteTime << ' ' 
+				<< header.lastWriteTime << ' '
+				<< (header.isDir ? 1 : 0) << ' '
 				<< header.fileName << FILENAME_DELIMITER;
 }
 
@@ -286,11 +296,13 @@ RecordData::RecordData(const Dbt& dbRec)
 }
 
 RecordData::RecordData(const RecordID& parentID, 
-					   time_t lastWriteTime, 
+					   time_t lastWriteTime,
+					   bool isDir,
 					   const std::string& fileName)
 {
 	header.parentID = parentID;
 	header.lastWriteTime = lastWriteTime;
+	header.isDir = isDir;
 	header.fileName = fileName;
 }
 

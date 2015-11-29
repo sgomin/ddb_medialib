@@ -21,13 +21,17 @@ private:
     DataT data_;
 };
 
+#define ROOT_RECORD_ID RecordID()
+#define NULL_RECORD_ID RecordID()
+
 struct RecordData
 {
     RecordData();
     RecordData(RecordData&& other) = default;
     explicit RecordData(const Dbt& dbRec);
     RecordData(const RecordID& parentID, 
-               time_t lastWriteTime, 
+               time_t lastWriteTime,
+			   bool isDir,
                const std::string& fileName);
     
     RecordData& operator=(RecordData&& other) = default;
@@ -38,6 +42,7 @@ struct RecordData
     {
         RecordID    parentID;
         time_t      lastWriteTime;
+		bool		isDir;
         std::string fileName;
     } header;
 };
@@ -63,6 +68,7 @@ public:
     
     /// Opens database at given directory, creates if doesn't exist 
     void        open(const std::string& path);
+	void		close();
     
     RecordData  get(const RecordID& id) const;
     RecordID    add(const RecordData& record);

@@ -102,14 +102,15 @@ try
 		return;
 	}
 	
+	const bool isDir = fs::is_directory(path);	
 	Record newRecord = make_Record(
-		RecordID(), 
-		RecordData(parentID, fs::last_write_time(path), path.string()));
+		NULL_RECORD_ID, 
+		RecordData(parentID, fs::last_write_time(path), isDir, path.string()));
 
 	const Records::iterator itOldRecord = std::lower_bound(
 		oldRecords.begin(), oldRecords.end(), newRecord, CmpByPath());
 
-	if (fs::is_directory(path) && recursive)
+	if (isDir && recursive)
 	{
 		const RecordID entryId = itOldRecord != oldRecords.cend() ?
 			itOldRecord->first : db_.add(newRecord.second);
@@ -153,7 +154,7 @@ try
 	{
 		changed_ = false;
 		
-		scanDir(RecordID(), 
+		scanDir(ROOT_RECORD_ID, 
 				dirs_.cbegin(), 
 				dirs_.cend(), 
 				/*recursive*/ true);
