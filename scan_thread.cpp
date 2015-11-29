@@ -8,11 +8,11 @@
 ScanThread::ScanThread(
 		const Settings::Directories& dirs,
 		Database& db)
- : thread_(std::ref(*this))
- , stop_(false)
+ : stop_(false)
  , dirs_(dirs)
  , db_(db)
 {
+	thread_ = std::thread(std::ref(*this));
 }
     
 ScanThread::~ScanThread()
