@@ -17,6 +17,11 @@ private:
     
 	Database &						db_;
     Gtk::VBox						sidebar_;
+	Gtk::HBox						firstRow_;
+	Gtk::ComboBoxText				styleCombo_;
+	Gtk::Button						settingsBtn_;
+	Gtk::ScrolledWindow				scrolledWindow_;
+	Gtk::TreeView					treeVeiew_;
 	Glib::RefPtr<Gtk::TreeStore>	pTreeModel_;
 };
 
