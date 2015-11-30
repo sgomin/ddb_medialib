@@ -7,9 +7,11 @@
 
 ScanThread::ScanThread(
 		const Settings::Directories& dirs,
+		const Extensions& extensions,
 		Database& db)
  : stop_(false)
  , dirs_(dirs)
+ , extensions_(extensions)
  , db_(db)
 {
 	thread_ = std::thread(std::ref(*this));
@@ -79,10 +81,13 @@ void ScanThread::scanDir(
 	
 	for (const Record& missing : oldRecords)
 	{
-		boost::system::error_code ec;
-		const bool exists = fs::exists(missing.second.header.fileName, ec);
+		const fs::path& fileName = missing.second.header.fileName;
+		const bool isUnsupportedExtension =
+			extensions_.find(fileName.extension().string()) == extensions_.end();
+		boost::system::error_code ec; 
 		
-		if (!exists && ec.value() == ENOENT)
+		if (isUnsupportedExtension || 
+			(!fs::exists(fileName, ec) && ec.value() == ENOENT))
 		{
 			changed_ = true;
 			db_.del(missing.first);
@@ -122,7 +127,13 @@ try
 	}
 	else // file
 	{
-		// TODO: check extension
+		const std::string ext = path.extension().string();
+		
+		if (extensions_.find(ext) == extensions_.end())
+		{
+			return; // unsupported extension
+		}
+				
 		if (itOldRecord == oldRecords.cend())
 		{
 			changed_ = true;
@@ -136,6 +147,7 @@ try
 		}
 	}
 	
+	// record was processing, so removing from the list
 	if (oldRecords.end() != itOldRecord)
 	{
 		oldRecords.erase(itOldRecord);

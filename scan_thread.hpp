@@ -6,17 +6,31 @@
 
 #include <boost/filesystem.hpp>
 namespace fs = boost::filesystem;
+#include <boost/algorithm/string/predicate.hpp>
 
+#include <set>
+#include <string>
 #include <atomic>
 #include <thread>
 #include <condition_variable>
 
 #include <db_cxx.h>
 
+struct CaseCompare
+{
+	bool operator() (const std::string& left, const std::string& right) const
+	{
+		return boost::ilexicographical_compare(left, right);
+	}
+};
+
+typedef std::set<std::string, CaseCompare> Extensions;
+
 class ScanThread
 {
 public:
     ScanThread(const Settings::Directories& dirs,
+			   const Extensions& extensions,
                Database& db);
     ~ScanThread();
     
@@ -41,8 +55,9 @@ private:
 	std::condition_variable_any	cond_;
 	std::atomic<bool>			stop_;
     const Settings::Directories dirs_;
+    const Extensions&			extensions_;
     Database&                   db_;
-    bool                        changed_ = false;
+	bool                        changed_ = false;
 	std::chrono::milliseconds	sleepTime_ = std::chrono::milliseconds(100);
 };
 

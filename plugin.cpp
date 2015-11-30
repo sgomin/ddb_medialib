@@ -30,6 +30,7 @@ public:
     Impl();
     ~Impl();
     int connect();
+	int disconnect();
     
     Settings const & getSettings() const;
     void     storeSettings(Settings settings);
@@ -44,6 +45,7 @@ private:
     const fs::path                      fnSettings_;
     Settings                            settings_;
 	static Database						db_;
+	Extensions							extensions_;
 	std::unique_ptr<ScanThread>			pScanThread_;
 };
 
@@ -95,7 +97,7 @@ int Plugin::connect()
 int Plugin::disconnect ()
 {
     std::clog << "[" PLUGIN_NAME " ] Disconnecting plugin" << std::endl;
-    return 0;
+	return s_pImpl->disconnect();
 }
 
 // static 
@@ -134,7 +136,6 @@ Plugin::Impl::Impl()
 	
 	const fs::path pathDb = fs::path(deadbeef->get_config_dir()) / DB_DIR;
 	db_.open(pathDb.string());
-	pScanThread_.reset(new ScanThread(settings_.directories, db_));
 }
 
 Plugin::Impl::~Impl()
@@ -154,6 +155,30 @@ Plugin::Impl::~Impl()
         std::cerr << "[" PLUGIN_NAME " ] Failed to save plugin settings: " 
                 << ex.what() << std::endl;
     }
+}
+
+
+namespace {
+	
+Extensions getSupportedExtensions()
+{
+	Extensions extensions;
+	struct DB_decoder_s **decoders = deadbeef->plug_get_decoder_list();
+    
+	for (size_t i = 0; decoders[i]; i++) 
+	{
+        const gchar **exts = decoders[i]->exts;
+        
+		for (size_t j = 0; exts[j]; j++)
+		{
+			std::string ext = std::string(".") + exts[j];
+            extensions.insert(std::move(ext));
+		}
+    }
+	
+	return extensions;
+}
+
 }
 
 int Plugin::Impl::connect()
@@ -185,8 +210,18 @@ int Plugin::Impl::connect()
         return -1;
     }
     
+	
+	extensions_ = getSupportedExtensions();
+	pScanThread_.reset(new ScanThread(settings_.directories, extensions_, db_));
+	
     std::clog << "[" PLUGIN_NAME " ] Successfully connected" << std::endl;
     return 0;
+}
+
+int Plugin::Impl::disconnect()
+{
+	pScanThread_.reset();
+	return 0;
 }
 
 // static
