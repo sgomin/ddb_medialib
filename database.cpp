@@ -60,6 +60,7 @@ void Database::close()
 	dbParentId_.close(0);
 	dbFilename_.close(0);
 	dbMain_.close(0);
+	env_.close(0);
 }
 
 RecordData Database::get(const RecordID& id) const
