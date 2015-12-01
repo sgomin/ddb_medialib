@@ -61,14 +61,19 @@ void MainWidget::fillData(
 	
 	for (Record& rec : children)
 	{
-		Gtk::TreeModel::Row row = *(pTreeModel_->append(to));
-		row[byDirColumns.fullPath] = rec.second.header.fileName;
-		row[byDirColumns.filename] = 
+		Gtk::TreeModel::iterator itRow = pTreeModel_->append(to);
+		(*itRow)[byDirColumns.fullPath] = rec.second.header.fileName;
+		(*itRow)[byDirColumns.filename] = 
 				fs::path(rec.second.header.fileName).filename().string();
 		
 		if (rec.second.header.isDir)
 		{
-			fillData(rec.first, row.children());
+			fillData(rec.first, (*itRow)->children());
+			
+			if ((*itRow)->children().empty())
+			{
+				pTreeModel_->erase(itRow);
+			}
 		}
 	}
 }
