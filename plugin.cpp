@@ -176,6 +176,10 @@ Extensions getSupportedExtensions()
 		}
     }
 	
+	extensions.insert(".flac");
+	extensions.insert(".wv");
+	extensions.insert(".mp3");
+	
 	return extensions;
 }
 
