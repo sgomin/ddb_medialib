@@ -1,7 +1,7 @@
 #ifndef SETTINGS_DLG_HPP
 #define	SETTINGS_DLG_HPP
 
-#include "plugin.h"
+#include "plugin.hpp"
 
 #include <set>
 

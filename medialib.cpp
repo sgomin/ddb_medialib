@@ -1,5 +1,5 @@
 #include "medialib.h"
-#include "plugin.h"
+#include "plugin.hpp"
 
 #include <iostream>
 

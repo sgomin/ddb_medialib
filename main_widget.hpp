@@ -1,7 +1,7 @@
 #ifndef MAIN_WIDGET_HPP
 #define	MAIN_WIDGET_HPP
 
-#include "plugin.h"
+#include "plugin.hpp"
 #include "database.hpp"
 
 #include <gtkmm.h>
@@ -13,6 +13,9 @@ public:
     
 private:
     void onSettings();
+	void onRowActivated(
+			const Gtk::TreeModel::Path& path, 
+			Gtk::TreeViewColumn* column);
 	void fillData(const RecordID& from, const Gtk::TreeModel::Children& to);
     
 	Database &						db_;

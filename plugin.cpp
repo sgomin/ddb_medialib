@@ -1,4 +1,4 @@
-#include "plugin.h"
+#include "plugin.hpp"
 
 #include "medialib.h"
 #include "main_widget.hpp"
@@ -175,10 +175,6 @@ Extensions getSupportedExtensions()
             extensions.insert(std::move(ext));
 		}
     }
-	
-	extensions.insert(".flac");
-	extensions.insert(".wv");
-	extensions.insert(".mp3");
 	
 	return extensions;
 }

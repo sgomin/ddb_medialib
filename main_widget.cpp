@@ -1,6 +1,7 @@
 #include "main_widget.hpp"
 
 #include "settings_dlg.hpp"
+#include "medialib.h"
 
 #include <boost/filesystem.hpp>
 namespace fs = boost::filesystem;
@@ -33,6 +34,8 @@ MainWidget::MainWidget(Database & db)
 	treeVeiew_.set_model(pTreeModel_);
 	treeVeiew_.append_column("File Name", byDirColumns.filename);
 	treeVeiew_.set_headers_visible(false);
+	treeVeiew_.signal_row_activated().connect(
+            sigc::mem_fun(*this, &MainWidget::onRowActivated));
     
 	scrolledWindow_.set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);
     scrolledWindow_.add(treeVeiew_);
@@ -76,4 +79,80 @@ void MainWidget::fillData(
 			}
 		}
 	}
+}
+
+void MainWidget::onRowActivated(
+		const Gtk::TreeModel::Path& path, 
+		Gtk::TreeViewColumn* /*column*/)
+try
+{
+	Gtk::TreeModel::iterator itRow = pTreeModel_->get_iter(path);
+	
+	if (!itRow)
+	{
+		return;
+	}
+	
+	struct LockPlayLists
+	{
+		LockPlayLists() { deadbeef->pl_lock(); }
+		~LockPlayLists() { deadbeef->pl_unlock(); }
+	} lockPlaylists;
+	
+	ddb_playlist_t* plt = deadbeef->plt_get_curr();
+	
+	if (!plt)
+	{
+		int idx = deadbeef->plt_add(deadbeef->plt_get_count(), "New");
+		deadbeef->plt_set_curr_idx(idx);
+		plt = deadbeef->plt_get_curr();
+	}
+	
+	assert(plt);
+	
+	struct LockPlayList
+	{
+		LockPlayList(ddb_playlist_t* plt) : plt_(plt)
+		{
+			if (deadbeef->plt_add_files_begin (plt, 0) < 0)
+			{
+				throw std::runtime_error(
+						"could not add files to playlist (lock failed)");
+			}
+		}
+		
+		~LockPlayList()
+		{
+			deadbeef->plt_add_files_end(plt_, 0);
+			deadbeef->plt_modified (plt_);
+			deadbeef->plt_save_config (plt_);
+			deadbeef->conf_save ();
+			deadbeef->plt_unref(plt_);
+		}
+		
+		ddb_playlist_t* const plt_;
+	} lockPlaylist(plt);
+	
+	const Glib::ustring fileName = (*itRow)[byDirColumns.fullPath];
+	
+	if (fs::is_directory(fileName.c_str()))
+	{
+		if (deadbeef->plt_add_dir2 (0, plt, fileName.c_str(), NULL, NULL) < 0)
+		{
+			std::cerr << "Failed to add folder '" << fileName
+					<< "' to playlist" << std::endl;
+		}
+	}
+	else if (fs::is_regular(fileName.c_str()))
+	{
+		if (deadbeef->plt_add_file2 (0, plt, fileName.c_str(), NULL, NULL) < 0)
+        {
+			std::cerr << "Failed to add file '" << fileName
+					<< "' to playlist" << std::endl;
+		}
+	}
+}
+catch(const std::exception& e)
+{
+	std::cerr << "Failed to add file to playlist: " << e.what() << std::endl;
 }
