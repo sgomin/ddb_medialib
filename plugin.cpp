@@ -45,7 +45,6 @@ private:
     const fs::path                      fnSettings_;
     Settings                            settings_;
 	static Database						db_;
-	Extensions							extensions_;
 	std::unique_ptr<ScanThread>			pScanThread_;
 };
 
@@ -211,8 +210,8 @@ int Plugin::Impl::connect()
     }
     
 	
-	extensions_ = getSupportedExtensions();
-	pScanThread_.reset(new ScanThread(settings_.directories, extensions_, db_));
+	pScanThread_.reset(new ScanThread(
+						settings_.directories, getSupportedExtensions(), db_));
 	
     std::clog << "[" PLUGIN_NAME " ] Successfully connected" << std::endl;
     return 0;

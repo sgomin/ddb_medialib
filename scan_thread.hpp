@@ -55,7 +55,7 @@ private:
 	std::condition_variable_any	cond_;
 	std::atomic<bool>			stop_;
     const Settings::Directories dirs_;
-    const Extensions&			extensions_;
+    const Extensions			extensions_;
     Database&                   db_;
 	bool                        changed_ = false;
 	std::chrono::milliseconds	sleepTime_ = std::chrono::milliseconds(100);
