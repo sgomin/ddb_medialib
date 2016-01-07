@@ -1,5 +1,5 @@
-CXXFLAGS += -std=c++11 -fPIC $$(pkg-config --cflags glibmm-2.4 gtkmm-3.0)
-LDFLAGS += $$(pkg-config --libs glibmm-2.4 gtkmm-3.0) -lboost_system -lboost_exception -ldb_cxx -lboost_filesystem
+CXXFLAGS += -std=c++11 -fPIC $$(pkg-config --cflags gtkmm-3.0)
+LDFLAGS += $$(pkg-config --libs gtkmm-3.0) -lboost_system -lboost_exception -ldb_cxx -lboost_filesystem
 
 ifdef DEBUG
     CXXFLAGS += -DDEBUG -ggdb3 -Wall
@@ -8,7 +8,7 @@ else
 endif
 
 ddb_misc_medialib.so: database.o main_widget.o medialib.o plugin.o scan_thread.o settings_dlg.o
-	$(CXX) $(LDFLAGS) -o ddb_misc_medialib.so -shared database.o main_widget.o medialib.o plugin.o scan_thread.o settings_dlg.o
+	$(CXX) -o ddb_misc_medialib.so -shared database.o main_widget.o medialib.o plugin.o scan_thread.o settings_dlg.o $(LDFLAGS)
 
 database.o: database.cpp database.hpp
 	$(CXX) $(CXXFLAGS) -Wno-deprecated -c database.cpp
