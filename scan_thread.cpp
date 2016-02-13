@@ -147,7 +147,7 @@ try
 		}
 	}
 	
-	// record was processing, so removing from the list
+	// record was processed, so removing from the list
 	if (oldRecords.end() != itOldRecord)
 	{
 		oldRecords.erase(itOldRecord);
@@ -162,6 +162,8 @@ catch(const std::exception& ex)
 void ScanThread::operator() ()
 try
 {
+	std::clog << "Starting scanning thread" << std::endl;
+	
 	while (!stop_)
 	{
 		changed_ = false;
@@ -192,6 +194,8 @@ try
 			std::this_thread::yield();
 		}
 	}
+	
+	std::clog << "Scanning thread stopped" << std::endl;
 }
 catch(const std::exception& ex)
 {
