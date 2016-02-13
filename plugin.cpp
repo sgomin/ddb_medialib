@@ -40,15 +40,19 @@ private:
     static ddb_gtkui_widget_t * createWidget();
     static void destroyWidget(ddb_gtkui_widget_t *w);
     
+	typedef std::unique_ptr<ScanThread> ScanThreadPtr;
+	
     Glib::RefPtr<Gtk::Application>      app_;
     ddb_gtkui_t                     *   pGtkUi_;
     const fs::path                      fnSettings_;
-    Settings                            settings_;
+    static Settings                     settings_;
 	static Database						db_;
-	std::unique_ptr<ScanThread>			pScanThread_;
+	static ScanThreadPtr				pScanThread_;
 };
 
+Settings Plugin::Impl::settings_;
 Database Plugin::Impl::db_;
+Plugin::Impl::ScanThreadPtr Plugin::Impl::pScanThread_;
 std::unique_ptr<Plugin::Impl> Plugin::s_pImpl;
 
 //static 
@@ -73,7 +77,7 @@ int Plugin::stop()
 {
     try
     {
-        std::clog << "[" PLUGIN_NAME " ] Stoping plugin" << std::endl;
+        std::clog << "[" PLUGIN_NAME " ] Stopping plugin" << std::endl;
         s_pImpl.reset();
         return 0;
     }
@@ -132,28 +136,24 @@ Plugin::Impl::Impl()
 			settings_.directories[dir.first] = std::move(dirSettings);
 		}
 	}
-	
-	const fs::path pathDb = fs::path(deadbeef->get_config_dir()) / DB_DIR;
-	db_.open(pathDb.string());
 }
 
 Plugin::Impl::~Impl()
+try
 {
-	try
-    {
-		db_.close();
-		storeSettings(std::move(settings_));
-    }
-	catch(const DbException & ex)
-    {
-        std::cerr << "[" PLUGIN_NAME " ] Failed to close database: " 
-                << ex.what() << std::endl;
-    }
-    catch(const std::exception & ex)
-    {
-        std::cerr << "[" PLUGIN_NAME " ] Failed to save plugin settings: " 
-                << ex.what() << std::endl;
-    }
+	assert(!pScanThread_);
+	db_.close();
+	storeSettings(std::move(settings_));
+}
+catch(const DbException & ex)
+{
+	std::cerr << "[" PLUGIN_NAME " ] Failed to close database: " 
+			<< ex.what() << std::endl;
+}
+catch(const std::exception & ex)
+{
+	std::cerr << "[" PLUGIN_NAME " ] Failed to save plugin settings: " 
+			<< ex.what() << std::endl;
 }
 
 
@@ -209,23 +209,34 @@ int Plugin::Impl::connect()
         return -1;
     }
     
-	
-	pScanThread_.reset(new ScanThread(
-						settings_.directories, getSupportedExtensions(), db_));
-	
-    std::clog << "[" PLUGIN_NAME " ] Successfully connected" << std::endl;
+	std::clog << "[" PLUGIN_NAME " ] Successfully connected" << std::endl;
     return 0;
 }
 
 int Plugin::Impl::disconnect()
+try
 {
+	std::clog << "Stopping scanning thread" << std::endl;
 	pScanThread_.reset();
 	return 0;
+}
+catch(const std::exception & ex)
+{
+	std::cerr << "[" PLUGIN_NAME " ] Failed to stop scan thread: " 
+			<< ex.what() << std::endl;
+	return -1;
 }
 
 // static
 ddb_gtkui_widget_t * Plugin::Impl::createWidget()
+try
 {
+	const fs::path pathDb = fs::path(deadbeef->get_config_dir()) / DB_DIR;
+	db_.open(pathDb.string());
+	
+	pScanThread_.reset(new ScanThread(
+						settings_.directories, getSupportedExtensions(), db_));
+	
     std::clog << "[" PLUGIN_NAME " ] Creating widget " << std::endl;
     ddb_gtkui_widget_t *w = 
             static_cast<ddb_gtkui_widget_t*>(malloc(sizeof(ddb_gtkui_widget_t)));
@@ -234,6 +245,18 @@ ddb_gtkui_widget_t * Plugin::Impl::createWidget()
     w->widget = GTK_WIDGET( pMainWidget->gobj() );
     w->destroy = &destroyWidget;
     return w;
+}
+catch(const DbException & ex)
+{
+	std::cerr << "[" PLUGIN_NAME " ] Failed to open database: " 
+			<< ex.what() << std::endl;
+	return nullptr;
+}
+catch(const std::exception & ex)
+{
+	std::cerr << "[" PLUGIN_NAME " ] Initialisation error: " 
+			<< ex.what() << std::endl;
+	return nullptr;
 }
 
 // static 
