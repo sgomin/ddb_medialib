@@ -13,7 +13,7 @@ ddb_misc_medialib.so: database.o main_widget.o medialib.o plugin.o scan_thread.o
 database.o: database.cpp database.hpp
 	$(CXX) $(CXXFLAGS) -Wno-deprecated -c database.cpp
 
-main_widget.o: main_widget.cpp main_widget.hpp
+main_widget.o: main_widget.cpp main_widget.hpp event_queue.hpp
 	$(CXX) $(CXXFLAGS) -c main_widget.cpp
 
 medialib.o: medialib.cpp medialib.h
@@ -22,7 +22,7 @@ medialib.o: medialib.cpp medialib.h
 plugin.o: plugin.cpp plugin.hpp
 	$(CXX) $(CXXFLAGS) -c plugin.cpp
 
-scan_thread.o: scan_thread.cpp scan_thread.hpp
+scan_thread.o: scan_thread.cpp scan_thread.hpp event_queue.hpp
 	$(CXX) $(CXXFLAGS) -c scan_thread.cpp
 
 settings_dlg.o: settings_dlg.cpp settings_dlg.hpp
