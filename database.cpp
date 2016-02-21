@@ -4,6 +4,7 @@
 namespace fs = boost::filesystem;
 //#include <boost/archive/binary_iarchive.hpp>
 //#include <boost/archive/binary_oarchive.hpp>
+#include <boost/functional/hash/hash.hpp>
 
 #include <strstream>
 #include <sstream>
@@ -26,6 +27,17 @@ const char FILENAME_DELIMITER = ':';
 
 //} // namespace serialization
 //} // namespace boost
+
+bool operator==(RecordID const& left, RecordID const& right)
+{
+	return memcmp(left.data(), right.data(), left.size());
+}
+
+size_t hash_value(RecordID const& id)
+{
+	return boost::hash_range(id.data(), id.data() + id.size());
+}
+
 
 Database::Database() 
  : env_(0)

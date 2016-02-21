@@ -69,6 +69,12 @@ void MainWidget::fillData(
 		(*itRow)[byDirColumns.filename] = 
 				fs::path(rec.second.header.fileName).filename().string();
 		
+		
+		Gtk::TreeModel::Path path = pTreeModel_->get_path(itRow);
+		
+		file2record_.insert(std::make_pair(rec.first, 
+			Gtk::TreeModel::RowReference(pTreeModel_, std::move(path))));
+		
 		if (rec.second.header.isDir)
 		{
 			fillData(rec.first, (*itRow)->children());
