@@ -8,9 +8,9 @@ namespace fs = boost::filesystem;
 
 struct ByDirectoryColumns : Gtk::TreeModel::ColumnRecord
 {
-	Gtk::TreeModelColumn<Glib::ustring>	fullPath;
+	Gtk::TreeModelColumn<RecordID>	fileId;
 	Gtk::TreeModelColumn<Glib::ustring>	filename;
-	ByDirectoryColumns() { add(fullPath); add(filename); }
+	ByDirectoryColumns() { add(fileId); add(filename); }
 };
 
 static const ByDirectoryColumns byDirColumns;
@@ -65,7 +65,7 @@ void MainWidget::fillData(
 	for (Record& rec : children)
 	{
 		Gtk::TreeModel::iterator itRow = pTreeModel_->append(to);
-		(*itRow)[byDirColumns.fullPath] = rec.second.header.fileName;
+		(*itRow)[byDirColumns.fileId] = rec.first;
 		(*itRow)[byDirColumns.filename] = 
 				fs::path(rec.second.header.fileName).filename().string();
 		
@@ -133,9 +133,10 @@ try
 		ddb_playlist_t* const plt_;
 	} lockPlaylist(plt);
 	
-	const Glib::ustring fileName = (*itRow)[byDirColumns.fullPath];
+	RecordData const rec = db_.get((*itRow)[byDirColumns.fileId]);
+	std::string const& fileName = rec.header.fileName;
 	
-	if (fs::is_directory(fileName.c_str()))
+	if (rec.header.isDir)
 	{
 		if (deadbeef->plt_add_dir2 (0, plt, fileName.c_str(), NULL, NULL) < 0)
 		{
