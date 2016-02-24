@@ -234,14 +234,18 @@ try
 	const fs::path pathDb = fs::path(deadbeef->get_config_dir()) / DB_DIR;
 	db_.open(pathDb.string());
 	
-	pScanThread_.reset(new ScanThread(
-						settings_.directories, getSupportedExtensions(), db_));
-	
-    std::clog << "[" PLUGIN_NAME " ] Creating widget " << std::endl;
+	std::clog << "[" PLUGIN_NAME " ] Creating widget " << std::endl;
     ddb_gtkui_widget_t *w = 
             static_cast<ddb_gtkui_widget_t*>(malloc(sizeof(ddb_gtkui_widget_t)));
     memset(w, 0, sizeof (*w));
     MainWidget * pMainWidget = new MainWidget(db_);
+	
+	pScanThread_.reset(new ScanThread(
+						settings_.directories, 
+						getSupportedExtensions(), 
+						db_,
+						pMainWidget->eventQueue_));
+	
     w->widget = GTK_WIDGET( pMainWidget->gobj() );
     w->destroy = &destroyWidget;
     return w;

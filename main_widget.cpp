@@ -15,6 +15,7 @@ struct ByDirectoryColumns : Gtk::TreeModel::ColumnRecord
 
 static const ByDirectoryColumns byDirColumns;
 
+
 MainWidget::MainWidget(Database & db)
  : db_(db)
  , settingsBtn_("Settings")
@@ -46,6 +47,7 @@ MainWidget::MainWidget(Database & db)
     show_all();
 }
 
+
 void MainWidget::onSettings()
 {
     Settings settings = Plugin::getSettings();
@@ -57,23 +59,17 @@ void MainWidget::onSettings()
     }
 }
 
+
 void MainWidget::fillData(
-	const RecordID& from, const Gtk::TreeModel::Children& to)
+		const RecordID& from, const Gtk::TreeModel::Children& to)
 {
 	Records children = db_.children(from);
 	
-	for (Record& rec : children)
+	for (Record const& rec : children)
 	{
 		Gtk::TreeModel::iterator itRow = pTreeModel_->append(to);
-		(*itRow)[byDirColumns.fileId] = rec.first;
-		(*itRow)[byDirColumns.filename] = 
-				fs::path(rec.second.header.fileName).filename().string();
 		
-		
-		Gtk::TreeModel::Path path = pTreeModel_->get_path(itRow);
-		
-		file2record_.insert(std::make_pair(rec.first, 
-			Gtk::TreeModel::RowReference(pTreeModel_, std::move(path))));
+		fillRow(itRow, rec);
 		
 		if (rec.second.header.isDir)
 		{
@@ -86,6 +82,20 @@ void MainWidget::fillData(
 		}
 	}
 }
+
+
+void MainWidget::fillRow(Gtk::TreeModel::iterator itRow, Record const& rec)
+{
+	(*itRow)[byDirColumns.fileId] = rec.first;
+	(*itRow)[byDirColumns.filename] = 
+			fs::path(rec.second.header.fileName).filename().string();
+
+	Gtk::TreeModel::Path path = pTreeModel_->get_path(itRow);
+
+	file2record_.insert(std::make_pair(rec.first, 
+		Gtk::TreeModel::RowReference(pTreeModel_, std::move(path))));
+}
+
 
 void MainWidget::onRowActivated(
 		const Gtk::TreeModel::Path& path, 

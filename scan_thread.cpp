@@ -8,11 +8,13 @@
 ScanThread::ScanThread(
 		const Settings::Directories& dirs,
 		const Extensions& extensions,
-		Database& db)
+		Database& db,
+		ScanEventQueue& eventSink)
  : stop_(false)
  , dirs_(dirs)
  , extensions_(extensions)
  , db_(db)
+ , eventSink_(eventSink)
 {
 	thread_ = std::thread(std::ref(*this));
 }
@@ -91,6 +93,7 @@ void ScanThread::scanDir(
 		{
 			changed_ = true;
 			db_.del(missing.first);
+			eventSink_.push(ScanEvent{ ScanEvent::DELETED, missing.first });
 		}
 	}
 }
@@ -120,6 +123,12 @@ try
 		const RecordID entryId = itOldRecord != oldRecords.cend() ?
 			itOldRecord->first : db_.add(newRecord.second);
 
+		// if new entry
+		if (itOldRecord == oldRecords.cend())
+		{
+			eventSink_.push(ScanEvent{ ScanEvent::ADDED, entryId });
+		}
+		
 		scanDir(entryId, 
 				fs::directory_iterator(path), 
 				fs::directory_iterator(), 
@@ -137,13 +146,17 @@ try
 		if (itOldRecord == oldRecords.cend())
 		{
 			changed_ = true;
-			db_.add(newRecord.second);
+			RecordID newId = db_.add(newRecord.second);
+			eventSink_.push(ScanEvent{ ScanEvent::ADDED, newId });
 		}
 		else if(newRecord.second.header.lastWriteTime != 
 				itOldRecord->second.header.lastWriteTime)
 		{
 			changed_ = true;
-			db_.replace(itOldRecord->first, newRecord.second);
+			const RecordID& replaceId = itOldRecord->first;
+			db_.replace(replaceId, newRecord.second);
+			eventSink_.push(ScanEvent{ ScanEvent::DELETED, replaceId });
+			eventSink_.push(ScanEvent{ ScanEvent::ADDED, replaceId });
 		}
 	}
 	

@@ -3,6 +3,7 @@
 
 #include "plugin.hpp"
 #include "database.hpp"
+#include "scan_event.hpp"
 
 #include <boost/functional/hash.hpp>
 
@@ -15,12 +16,15 @@ class MainWidget : public Gtk::EventBox
 public:
     MainWidget(Database & db);
     
+	ScanEventQueue eventQueue_;
+	
 private:
     void onSettings();
 	void onRowActivated(
 			const Gtk::TreeModel::Path& path, 
 			Gtk::TreeViewColumn* column);
 	void fillData(const RecordID& from, const Gtk::TreeModel::Children& to);
+	void fillRow(Gtk::TreeModel::iterator itRow, Record const& rec);
     
 	typedef std::unordered_multimap<RecordID, 
 									Gtk::TreeModel::RowReference, 

@@ -3,6 +3,7 @@
 
 #include "settings.hpp"
 #include "database.hpp"
+#include "scan_event.hpp"
 
 #include <boost/filesystem.hpp>
 namespace fs = boost::filesystem;
@@ -31,7 +32,8 @@ class ScanThread
 public:
     ScanThread(const Settings::Directories& dirs,
 			   const Extensions& extensions,
-               Database& db);
+               Database& db,
+			   ScanEventQueue& eventSink);
     ~ScanThread();
     
     void operator() ();
@@ -57,6 +59,7 @@ private:
     const Settings::Directories dirs_;
     const Extensions			extensions_;
     Database&                   db_;
+	ScanEventQueue&				eventSink_;
 	bool                        changed_ = false;
 	std::chrono::milliseconds	sleepTime_ = std::chrono::milliseconds(100);
 };
