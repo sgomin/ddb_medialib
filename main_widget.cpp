@@ -206,7 +206,6 @@ bool MainWidget::onIdle()
 		case ScanEvent::UPDATED:
 			break;
 		}
-		
 	}
 	
 	return true;

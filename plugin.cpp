@@ -43,13 +43,14 @@ private:
 	typedef std::unique_ptr<ScanThread> ScanThreadPtr;
 	
     Glib::RefPtr<Gtk::Application>      app_;
-    ddb_gtkui_t                     *   pGtkUi_;
+    static ddb_gtkui_t              *   pGtkUi_;
     const fs::path                      fnSettings_;
     static Settings                     settings_;
 	static Database						db_;
 	static ScanThreadPtr				pScanThread_;
 };
 
+ddb_gtkui_t * Plugin::Impl::pGtkUi_ = nullptr;
 Settings Plugin::Impl::settings_;
 Database Plugin::Impl::db_;
 Plugin::Impl::ScanThreadPtr Plugin::Impl::pScanThread_;
@@ -142,13 +143,7 @@ Plugin::Impl::~Impl()
 try
 {
 	assert(!pScanThread_);
-	db_.close();
 	storeSettings(std::move(settings_));
-}
-catch(const DbException & ex)
-{
-	std::cerr << "[" PLUGIN_NAME " ] Failed to close database: " 
-			<< ex.what() << std::endl;
 }
 catch(const std::exception & ex)
 {
@@ -182,6 +177,10 @@ Extensions getSupportedExtensions()
 
 int Plugin::Impl::connect()
 {
+	const fs::path pathDb = fs::path(deadbeef->get_config_dir()) / DB_DIR;
+	std::clog << "[" PLUGIN_NAME " ] Opening database at " << pathDb << std::endl;
+	db_.open(pathDb.string());
+	
     pGtkUi_ = (ddb_gtkui_t *) deadbeef->plug_get_for_id(DDB_GTKUI_PLUGIN_ID);
     
     if (pGtkUi_) 
@@ -218,7 +217,15 @@ try
 {
 	std::clog << "Stopping scanning thread" << std::endl;
 	pScanThread_.reset();
+	std::clog << "[" PLUGIN_NAME " ] Closing database " << std::endl;
+	db_.close();
 	return 0;
+}
+catch(const DbException & ex)
+{
+	std::cerr << "[" PLUGIN_NAME " ] Failed to close database: " 
+			<< ex.what() << std::endl;
+	return -1;
 }
 catch(const std::exception & ex)
 {
@@ -231,15 +238,13 @@ catch(const std::exception & ex)
 ddb_gtkui_widget_t * Plugin::Impl::createWidget()
 try
 {
-	const fs::path pathDb = fs::path(deadbeef->get_config_dir()) / DB_DIR;
-	db_.open(pathDb.string());
-	
 	std::clog << "[" PLUGIN_NAME " ] Creating widget " << std::endl;
     ddb_gtkui_widget_t *w = 
             static_cast<ddb_gtkui_widget_t*>(malloc(sizeof(ddb_gtkui_widget_t)));
     memset(w, 0, sizeof (*w));
     MainWidget * pMainWidget = new MainWidget(db_);
 	
+	std::clog << "[" PLUGIN_NAME " ] Starting scan thread " << std::endl;
 	pScanThread_.reset(new ScanThread(
 						settings_.directories, 
 						getSupportedExtensions(), 
@@ -248,6 +253,7 @@ try
 	
     w->widget = GTK_WIDGET( pMainWidget->gobj() );
     w->destroy = &destroyWidget;
+	pGtkUi_->w_override_signals (w->widget, w);
     return w;
 }
 catch(const DbException & ex)
@@ -266,6 +272,8 @@ catch(const std::exception & ex)
 // static 
 void Plugin::Impl::destroyWidget(ddb_gtkui_widget_t * w)
 {
+	std::clog << "[" PLUGIN_NAME " ] Stopping scan thread " << std::endl;
+	pScanThread_.reset();
     std::clog << "[" PLUGIN_NAME " ] Destroying widget " << std::endl;
     delete Glib::wrap(w->widget);
 }
