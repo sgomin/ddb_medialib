@@ -53,9 +53,11 @@ struct RecordData
 
 typedef std::pair<RecordID, RecordData> Record;
 
-inline Record make_Record(RecordID&& id, RecordData&& data)
+template<typename RecordIDT, typename RecordDataT>
+inline Record make_Record(RecordIDT&& id, RecordDataT&& data)
 {
-    return std::make_pair(std::move(id), std::move(data));
+    return std::make_pair(std::forward<RecordIDT>(id), 
+						  std::forward<RecordDataT>(data));
 }
 
 typedef std::vector<Record> Records;

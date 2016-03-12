@@ -15,21 +15,29 @@ class MainWidget : public Gtk::EventBox
 {
 public:
     MainWidget(Database & db);
+	~MainWidget() override;
     
 	ScanEventQueue eventQueue_;
 	
 private:
+	// signal handlers
     void onSettings();
 	void onRowActivated(
 			const Gtk::TreeModel::Path& path, 
 			Gtk::TreeViewColumn* column);
+	bool onIdle();
+	
+	// auxiliary functions
 	void fillData(const RecordID& from, const Gtk::TreeModel::Children& to);
 	void fillRow(Gtk::TreeModel::iterator itRow, Record const& rec);
+	void delRec(const RecordID& id);
+	void addRec(const RecordID& id);
+	void onPreDeleteRow(Gtk::TreeModel::Row const& row);
     
-	typedef std::unordered_multimap<RecordID, 
-									Gtk::TreeModel::RowReference, 
-									boost::hash<RecordID>>
-		FileToRecordMap;
+	typedef std::unordered_map<
+		RecordID, 
+		Gtk::TreeModel::RowReference, 
+		boost::hash<RecordID>> FileToRowMap;
 	
 	Database &						db_;
     Gtk::VBox						sidebar_;
@@ -39,7 +47,8 @@ private:
 	Gtk::ScrolledWindow				scrolledWindow_;
 	Gtk::TreeView					treeVeiew_;
 	Glib::RefPtr<Gtk::TreeStore>	pTreeModel_;
-	FileToRecordMap					file2record_;
+	FileToRowMap					file2row_;
+	sigc::connection				idleConnection_;
 };
 
 

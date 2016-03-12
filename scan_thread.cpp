@@ -155,8 +155,7 @@ try
 			changed_ = true;
 			const RecordID& replaceId = itOldRecord->first;
 			db_.replace(replaceId, newRecord.second);
-			eventSink_.push(ScanEvent{ ScanEvent::DELETED, replaceId });
-			eventSink_.push(ScanEvent{ ScanEvent::ADDED, replaceId });
+			eventSink_.push(ScanEvent{ ScanEvent::UPDATED, replaceId });
 		}
 	}
 	

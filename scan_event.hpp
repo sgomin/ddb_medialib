@@ -6,13 +6,13 @@
 
 struct ScanEvent
 {
-	enum Type { ADDED, DELETED };
+	enum Type { ADDED, DELETED, UPDATED };
 	
 	Type		type;
 	RecordID	id;
 };
 
-typedef EventQueue<ScanEvent> ScanEventQueue;
+typedef SimpleEventQueue<ScanEvent> ScanEventQueue;
 
 #endif	/* SCAN_EVENT_HPP */
 

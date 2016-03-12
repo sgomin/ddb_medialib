@@ -31,6 +31,9 @@ MainWidget::MainWidget(Database & db)
 	
 	pTreeModel_ = Gtk::TreeStore::create(byDirColumns);
 	pTreeModel_->set_sort_column(byDirColumns.filename, Gtk::SORT_ASCENDING);
+	// adding mapping of root record to root row 
+	file2row_.insert(std::make_pair(ROOT_RECORD_ID, 
+		Gtk::TreeModel::RowReference(pTreeModel_, Gtk::TreeModel::Path("0"))));
 	fillData(ROOT_RECORD_ID, pTreeModel_->children());
 	treeVeiew_.set_model(pTreeModel_);
 	treeVeiew_.append_column("File Name", byDirColumns.filename);
@@ -45,6 +48,15 @@ MainWidget::MainWidget(Database & db)
 	sidebar_.pack_start(scrolledWindow_, Gtk::PACK_EXPAND_WIDGET);
     add(sidebar_);
     show_all();
+	
+	idleConnection_ = Glib::signal_idle().connect(
+			sigc::mem_fun(*this, &MainWidget::onIdle));
+}
+
+
+MainWidget::~MainWidget()
+{
+	idleConnection_.disconnect();
 }
 
 
@@ -92,7 +104,7 @@ void MainWidget::fillRow(Gtk::TreeModel::iterator itRow, Record const& rec)
 
 	Gtk::TreeModel::Path path = pTreeModel_->get_path(itRow);
 
-	file2record_.insert(std::make_pair(rec.first, 
+	file2row_.insert(std::make_pair(rec.first, 
 		Gtk::TreeModel::RowReference(pTreeModel_, std::move(path))));
 }
 
@@ -172,4 +184,85 @@ try
 catch(const std::exception& e)
 {
 	std::cerr << "Failed to add file to playlist: " << e.what() << std::endl;
+}
+
+
+bool MainWidget::onIdle()
+{
+	while (!eventQueue_.empty())
+	{
+		ScanEvent e = eventQueue_.pop();
+		
+		switch(e.type)
+		{
+		case ScanEvent::ADDED:
+			addRec(e.id);
+			break;
+			
+		case ScanEvent::DELETED:
+			delRec(e.id);
+			break;
+			
+		case ScanEvent::UPDATED:
+			break;
+		}
+		
+	}
+	
+	return true;
+}
+
+void MainWidget::delRec(const RecordID& id)
+{
+	FileToRowMap::iterator itRecord = file2row_.find(id);
+			
+	if (itRecord == file2row_.end())
+	{
+		assert(false);
+		return;
+	}
+	
+	assert(itRecord->second.is_valid());
+	
+	Gtk::TreeModel::Path const path = itRecord->second.get_path();
+	Gtk::TreeModel::iterator const itRow = pTreeModel_->get_iter(path);
+
+	onPreDeleteRow(*itRow);
+	pTreeModel_->erase(itRow);
+}
+
+
+void MainWidget::onPreDeleteRow(Gtk::TreeModel::Row const& row)
+{
+	for (Gtk::TreeModel::Row const& child : row.children())
+	{
+		onPreDeleteRow(child);
+	}
+	
+	const RecordID& id = row[byDirColumns.fileId];
+	file2row_.erase(id);
+}
+
+
+void MainWidget::addRec(const RecordID& id)
+try
+{
+	RecordData recData = db_.get(id);
+	FileToRowMap::iterator const itParentRecord = 
+			file2row_.find(recData.header.parentID);
+			
+	if (itParentRecord == file2row_.end())
+	{
+		assert(false);
+		throw std::runtime_error("Can't find parent row");
+	}
+	
+	Gtk::TreeModel::Path const parentPath = itParentRecord->second.get_path();
+	Gtk::TreeModel::iterator const itParentRow = pTreeModel_->get_iter(parentPath);
+	Gtk::TreeModel::iterator const itNewRow = pTreeModel_->append(itParentRow->children());
+	fillRow(itNewRow, make_Record(id, std::move(recData)));
+}
+catch(std::exception const& e)
+{
+	std::cerr << "Failed to add record: " << e.what() << std::endl;
 }

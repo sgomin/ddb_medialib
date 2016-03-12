@@ -30,7 +30,7 @@ const char FILENAME_DELIMITER = ':';
 
 bool operator==(RecordID const& left, RecordID const& right)
 {
-	return memcmp(left.data(), right.data(), left.size());
+	return memcmp(left.data(), right.data(), left.size()) == 0;
 }
 
 size_t hash_value(RecordID const& id)
