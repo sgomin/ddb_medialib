@@ -64,7 +64,8 @@ void ScanThread::scanDir(
             const RecordID& dirId, 
             EntriesIt itEntriesBegin, 
             EntriesIt itEntriesEnd,
-            bool recursive)
+            bool recursive,
+			bool forceDeleteMissing)
 {
 	if (stop_)
 	{
@@ -83,18 +84,9 @@ void ScanThread::scanDir(
 	
 	for (const Record& missing : oldRecords)
 	{
-		const fs::path& fileName = missing.second.header.fileName;
-		const bool isUnsupportedExtension =
-			extensions_.find(fileName.extension().string()) == extensions_.end();
-		boost::system::error_code ec; 
-		
-		if (isUnsupportedExtension || 
-			(!fs::exists(fileName, ec) && ec.value() == ENOENT))
-		{
-			changed_ = true;
-			db_.del(missing.first);
-			eventSink_.push(ScanEvent{ ScanEvent::DELETED, missing.first });
-		}
+		changed_ = true;
+		db_.del(missing.first);
+		eventSink_.push(ScanEvent{ ScanEvent::DELETED, missing.first });
 	}
 }
 
@@ -132,13 +124,12 @@ try
 		scanDir(entryId, 
 				fs::directory_iterator(path), 
 				fs::directory_iterator(), 
-				/*recursive*/ true);
+				/*recursive*/ true,
+				/*forceDeleteMissing*/ false);
 	}
 	else // file
 	{
-		const std::string ext = path.extension().string();
-		
-		if (extensions_.find(ext) == extensions_.end())
+		if (!isSupportedExtension(path))
 		{
 			return; // unsupported extension
 		}
@@ -146,22 +137,34 @@ try
 		if (itOldRecord == oldRecords.cend())
 		{
 			changed_ = true;
-			RecordID newId = db_.add(newRecord.second);
-			eventSink_.push(ScanEvent{ ScanEvent::ADDED, newId });
+			newRecord.first = db_.add(newRecord.second);
+			eventSink_.push(ScanEvent{ ScanEvent::ADDED, newRecord.first });
 		}
 		else if(newRecord.second.header.lastWriteTime != 
 				itOldRecord->second.header.lastWriteTime)
 		{
 			changed_ = true;
-			const RecordID& replaceId = itOldRecord->first;
-			db_.replace(replaceId, newRecord.second);
-			eventSink_.push(ScanEvent{ ScanEvent::UPDATED, replaceId });
+			newRecord.first = itOldRecord->first;
+			db_.replace(newRecord.first, newRecord.second);
+			eventSink_.push(ScanEvent{ ScanEvent::UPDATED, newRecord.first });
 		}
 	}
 	
 	// record was processed, so removing from the list
-	if (oldRecords.end() != itOldRecord)
+	oldRecords.erase(itOldRecord);
+}
+catch(const fs::filesystem_error& ex)
+{
+	std::cerr << "Failed to process filesystem element " 
+			<< path << ": " << ex.what() << std::endl;
+	
+	if (ex.code().value() != ENOENT) // if not file not found
 	{
+		const Record fakeRecord = make_Record(NULL_RECORD_ID, 
+						RecordData(NULL_RECORD_ID, 0, false, path.string()));
+		const Records::iterator itOldRecord = std::lower_bound(
+			oldRecords.begin(), oldRecords.end(), fakeRecord, CmpByPath());
+		// prevent record from deletion
 		oldRecords.erase(itOldRecord);
 	}
 }
@@ -169,6 +172,12 @@ catch(const std::exception& ex)
 {
 	std::cerr << "Failed to process filesystem element " 
 			<< path << ": " << ex.what() << std::endl;
+}
+
+
+bool ScanThread::isSupportedExtension(const fs::path& fileName)
+{
+	return extensions_.find(fileName.extension().string()) != extensions_.end();
 }
 
 void ScanThread::operator() ()
@@ -183,7 +192,8 @@ try
 		scanDir(ROOT_RECORD_ID, 
 				dirs_.cbegin(), 
 				dirs_.cend(), 
-				/*recursive*/ true);
+				/*recursive*/ true,
+				/*forceDeleteMissing*/ true);
 		
 		if (!changed_ && !stop_)
 		{

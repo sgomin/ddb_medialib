@@ -44,7 +44,8 @@ private:
             const RecordID& dirId, 
             EntriesIt itEntriesBegin, 
             EntriesIt itEntriesEnd,
-            bool recursive);
+            bool recursive,
+			bool forceDeleteMissing);
     
     void scanEntry(
             const fs::path& path, 
@@ -52,6 +53,7 @@ private:
             Records& oldRecords,
             bool recursive);
     
+	bool isSupportedExtension(const fs::path& fileName);
     
 	std::thread					thread_;
 	std::condition_variable_any	cond_;
