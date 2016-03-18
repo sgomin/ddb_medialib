@@ -151,21 +151,30 @@ try
 	}
 	
 	// record was processed, so removing from the list
-	oldRecords.erase(itOldRecord);
+	if (oldRecords.end() != itOldRecord)
+	{
+		oldRecords.erase(itOldRecord);
+	}
 }
 catch(const fs::filesystem_error& ex)
 {
 	std::cerr << "Failed to process filesystem element " 
 			<< path << ": " << ex.what() << std::endl;
 	
-	if (ex.code().value() != ENOENT) // if not file not found
+	// if the entry is inaccessible due to network resource down
+	// it shouldn't be deleted from the database
+	if (ex.code().value() != ENOENT)
 	{
 		const Record fakeRecord = make_Record(NULL_RECORD_ID, 
 						RecordData(NULL_RECORD_ID, 0, false, path.string()));
 		const Records::iterator itOldRecord = std::lower_bound(
 			oldRecords.begin(), oldRecords.end(), fakeRecord, CmpByPath());
+		
 		// prevent record from deletion
-		oldRecords.erase(itOldRecord);
+		if (oldRecords.end() != itOldRecord)
+		{
+			oldRecords.erase(itOldRecord);
+		}
 	}
 }
 catch(const std::exception& ex)
