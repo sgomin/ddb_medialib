@@ -7,8 +7,8 @@ else
     CXXFLAGS += -DNDEBUG -O3
 endif
 
-ddb_misc_medialib.so: database.o main_widget.o medialib.o plugin.o scan_thread.o settings_dlg.o
-	$(CXX) -o ddb_misc_medialib.so -shared database.o main_widget.o medialib.o plugin.o scan_thread.o settings_dlg.o $(LDFLAGS)
+ddb_misc_medialib.so: database.o main_widget.o medialib.o plugin.o scan_thread.o settings_dlg.o settings.o
+	$(CXX) -o ddb_misc_medialib.so -shared database.o main_widget.o medialib.o plugin.o scan_thread.o settings_dlg.o settings.o $(LDFLAGS)
 
 database.o: database.cpp database.hpp
 	$(CXX) $(CXXFLAGS) -Wno-deprecated -c database.cpp
@@ -27,6 +27,9 @@ scan_thread.o: scan_thread.cpp scan_thread.hpp event_queue.hpp
 
 settings_dlg.o: settings_dlg.cpp settings_dlg.hpp
 	$(CXX) $(CXXFLAGS) -c settings_dlg.cpp
+
+settings.o: settings.cpp settings.hpp
+	$(CXX) $(CXXFLAGS) -c settings.cpp
 
 all: ddb_misc_medialib.so
 

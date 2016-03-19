@@ -30,12 +30,14 @@ typedef std::set<std::string, CaseCompare> Extensions;
 class ScanThread
 {
 public:
-    ScanThread(const Settings::Directories& dirs,
+    ScanThread(const SettingsProvider& settings,
 			   const Extensions& extensions,
                Database& db,
 			   ScanEventQueue& eventSink);
     ~ScanThread();
     
+	void restart();
+	
     void operator() ();
 
 private:
@@ -53,12 +55,14 @@ private:
             Records& oldRecords,
             bool recursive);
     
+	bool shouldBreak() const;
 	bool isSupportedExtension(const fs::path& fileName);
     
 	std::thread					thread_;
 	std::condition_variable_any	cond_;
 	std::atomic<bool>			stop_;
-    const Settings::Directories dirs_;
+	std::atomic<bool>			restart_;
+    const SettingsProvider&		settings_;
     const Extensions			extensions_;
     Database&                   db_;
 	ScanEventQueue&				eventSink_;

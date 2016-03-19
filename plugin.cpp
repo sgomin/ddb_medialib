@@ -32,7 +32,7 @@ public:
     int connect();
 	int disconnect();
     
-    Settings const & getSettings() const;
+    Settings getSettings() const;
     void     storeSettings(Settings settings);
     
 private:
@@ -45,16 +45,16 @@ private:
     Glib::RefPtr<Gtk::Application>      app_;
     static ddb_gtkui_t              *   pGtkUi_;
     const fs::path                      fnSettings_;
-    static Settings                     settings_;
+	static SettingsProvider             settings_;
 	static Database						db_;
 	static ScanThreadPtr				pScanThread_;
 };
 
-ddb_gtkui_t * Plugin::Impl::pGtkUi_ = nullptr;
-Settings Plugin::Impl::settings_;
-Database Plugin::Impl::db_;
-Plugin::Impl::ScanThreadPtr Plugin::Impl::pScanThread_;
-std::unique_ptr<Plugin::Impl> Plugin::s_pImpl;
+ddb_gtkui_t *					Plugin::Impl::pGtkUi_ = nullptr;
+SettingsProvider				Plugin::Impl::settings_;
+Database						Plugin::Impl::db_;
+Plugin::Impl::ScanThreadPtr		Plugin::Impl::pScanThread_;
+std::unique_ptr<Plugin::Impl>	Plugin::s_pImpl;
 
 //static 
 int Plugin::start()
@@ -105,7 +105,7 @@ int Plugin::disconnect ()
 }
 
 // static 
-Settings const & Plugin::getSettings()
+Settings Plugin::getSettings()
 {
     return s_pImpl->getSettings();
 }
@@ -124,6 +124,8 @@ Plugin::Impl::Impl()
 	using boost::property_tree::ptree;
 	using namespace boost::property_tree::json_parser;
 	
+	Settings settings;
+	
 	ptree tree;
 	read_json(fnSettings_.string(), tree);
 	ptree::assoc_iterator itDirs = tree.find(CONFIG_DIRECTORIES_KEY);
@@ -134,21 +136,16 @@ Plugin::Impl::Impl()
 		{
 			Settings::Directory dirSettings;
 			dirSettings.recursive = dir.second.get(CONFIG_RECURSIVE_KEY, true);
-			settings_.directories[dir.first] = std::move(dirSettings);
+			settings.directories[dir.first] = std::move(dirSettings);
 		}
 	}
+	
+	settings_.setSettings(std::move(settings));
 }
 
 Plugin::Impl::~Impl()
-try
 {
 	assert(!pScanThread_);
-	storeSettings(std::move(settings_));
-}
-catch(const std::exception & ex)
-{
-	std::cerr << "[" PLUGIN_NAME " ] Failed to save plugin settings: " 
-			<< ex.what() << std::endl;
 }
 
 
@@ -246,7 +243,7 @@ try
 	
 	std::clog << "[" PLUGIN_NAME " ] Starting scan thread " << std::endl;
 	pScanThread_.reset(new ScanThread(
-						settings_.directories, 
+						settings_, 
 						getSupportedExtensions(), 
 						db_,
 						pMainWidget->eventQueue_));
@@ -278,9 +275,9 @@ void Plugin::Impl::destroyWidget(ddb_gtkui_widget_t * w)
     delete Glib::wrap(w->widget);
 }
 
-Settings const & Plugin::Impl::getSettings() const
+Settings Plugin::Impl::getSettings() const
 {
-    return settings_;
+	return settings_.getSettings();
 }
     
 void Plugin::Impl::storeSettings(Settings settings)
@@ -288,12 +285,11 @@ void Plugin::Impl::storeSettings(Settings settings)
 	using boost::property_tree::ptree;
 	using namespace boost::property_tree::json_parser;
 	
-    settings_ = std::move(settings);
 	ptree treeMain;
 	ptree::iterator itDirs = treeMain.push_back(
 			std::make_pair(CONFIG_DIRECTORIES_KEY, ptree()));
 	
-	for (auto dir : settings_.directories)
+	for (auto dir : settings.directories)
 	{
 		ptree::iterator itDir = itDirs->second.push_back(
 				std::make_pair(dir.first, ptree()));
@@ -302,4 +298,6 @@ void Plugin::Impl::storeSettings(Settings settings)
 	}
 	
     write_json(fnSettings_.string(), treeMain);
+	settings_.setSettings(std::move(settings));
+	pScanThread_->restart();
 }

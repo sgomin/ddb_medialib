@@ -13,8 +13,8 @@ public:
     static int connect();
     static int disconnect();
     
-    static Settings const & getSettings();
-    static void             storeSettings(Settings settings);
+    static Settings getSettings();
+    static void     storeSettings(Settings settings);
     
 private:
     class Impl;

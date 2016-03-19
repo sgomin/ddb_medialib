@@ -6,12 +6,13 @@
 #include <thread>
 
 ScanThread::ScanThread(
-		const Settings::Directories& dirs,
+		const SettingsProvider& settings,
 		const Extensions& extensions,
 		Database& db,
 		ScanEventQueue& eventSink)
  : stop_(false)
- , dirs_(dirs)
+ , restart_(true)
+ , settings_(settings)
  , extensions_(extensions)
  , db_(db)
  , eventSink_(eventSink)
@@ -24,6 +25,12 @@ ScanThread::~ScanThread()
 	stop_ = true;
 	cond_.notify_all();
 	thread_.join();
+}
+
+void ScanThread::restart()
+{
+	restart_ = true;
+	cond_.notify_all();
 }
 
 namespace {
@@ -67,7 +74,7 @@ void ScanThread::scanDir(
             bool recursive,
 			bool forceDeleteMissing)
 {
-	if (stop_)
+	if (shouldBreak())
 	{
 		return;
 	}
@@ -97,7 +104,7 @@ void ScanThread::scanEntry(
 			bool recursive)
 try
 {
-	if (stop_)
+	if (shouldBreak())
 	{
 		return;
 	}
@@ -192,15 +199,23 @@ bool ScanThread::isSupportedExtension(const fs::path& fileName)
 void ScanThread::operator() ()
 try
 {
-	std::clog << "Starting scanning thread" << std::endl;
+	std::clog << "Scanning thread started" << std::endl;
+	
+	Settings::Directories dirs;
 	
 	while (!stop_)
 	{
+		if (restart_)
+		{
+			dirs = settings_.getSettings().directories;
+			restart_ = false;
+		}
+		
 		changed_ = false;
 		
 		scanDir(ROOT_RECORD_ID, 
-				dirs_.cbegin(), 
-				dirs_.cend(), 
+				dirs.cbegin(), 
+				dirs.cend(), 
 				/*recursive*/ true,
 				/*forceDeleteMissing*/ true);
 		
@@ -236,4 +251,10 @@ catch(const std::exception& ex)
 catch(...)
 {
 	std::cerr << "Unexpected error in the file scan thread: " << std::endl;
+}
+
+
+bool ScanThread::shouldBreak() const
+{
+	return stop_ || restart_;
 }
