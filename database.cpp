@@ -79,23 +79,48 @@ RecordData Database::get(const RecordID& id) const
 {
 	Dbt key(id.data(), id.size());
 	Dbt data;
-	
-	const int err = dbMain_.get(/*txnid*/nullptr, &key, &data, /*flags*/0);
-	assert (err == 0);
+	thread_local static std::vector<char> buffer(256);
+		
+	while (true)
+	{
+		try
+		{
+			data.set_flags(DB_DBT_USERMEM);
+			data.set_data(buffer.data());
+			data.set_ulen(buffer.size());
+			const int err = dbMain_.get(/*txnid*/nullptr, &key, &data, /*flags*/0);
+			assert (err == 0);
+			break;
+		}
+		catch(DbException const& ex)
+		{
+			if (ex.get_errno() !=  DB_BUFFER_SMALL)
+			{
+				throw;
+			}
+
+			buffer.resize(data.get_size() * 1.5);
+		}
+	}
 	
 	return RecordData(data);
 }
 
 RecordID Database::add(const RecordData& record)
 {
-	Dbt key;
+	RecordID newId;
+	
+	Dbt key(newId.data(), 0);
+	key.set_flags(DB_DBT_USERMEM);
+	key.set_ulen(RecordID::size());
+	
 	const std::string str = record.data();
 	Dbt data(const_cast<char*>(str.c_str()), str.size());
 	
 	const int err = dbMain_.put(nullptr, &key, &data, DB_APPEND);
 	assert (err == 0);
-	
-	return RecordID(key);
+	assert (key.get_size() == RecordID::size());
+	return newId;
 }
 
 void Database::del(const RecordID& id)
