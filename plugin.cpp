@@ -173,6 +173,7 @@ Extensions getSupportedExtensions()
 }
 
 int Plugin::Impl::connect()
+try
 {
 	const fs::path pathDb = fs::path(deadbeef->get_config_dir()) / DB_DIR;
 	std::clog << "[" PLUGIN_NAME " ] Opening database at " << pathDb << std::endl;
@@ -207,6 +208,18 @@ int Plugin::Impl::connect()
     
 	std::clog << "[" PLUGIN_NAME " ] Successfully connected" << std::endl;
     return 0;
+}
+catch(const DbException & ex)
+{
+	std::cerr << "[" PLUGIN_NAME " ] Failed to open database: " 
+			<< ex.what() << std::endl;
+	return -1;
+}
+catch(const std::exception & ex)
+{
+	std::cerr << "[" PLUGIN_NAME " ] Failed to connect plugin: " 
+			<< ex.what() << std::endl;
+	return -1;
 }
 
 int Plugin::Impl::disconnect()
