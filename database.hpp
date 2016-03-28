@@ -1,6 +1,8 @@
 #ifndef DATABASE_HPP
 #define	DATABASE_HPP
 
+#include <boost/uuid/uuid.hpp>
+
 #include <iosfwd>
 #include <array>
 #include <vector>
@@ -10,23 +12,27 @@
 class RecordID
 {
 public:
-    RecordID();
+    RecordID() {};
     explicit RecordID(const Dbt& dbRec);
-
-    uint8_t * data() const { return const_cast<uint8_t*>(data_.data()); };
-    constexpr static size_t size() { return DB_HEAP_RID_SZ; }
 	
+	static RecordID nil();
+	static RecordID generate();
+
+    uint8_t * data() const { return const_cast<uint8_t*>(data_.data); };
+    static size_t size() { return boost::uuids::uuid::static_size(); }
+	
+	friend bool operator==(RecordID const& left, RecordID const& right);
+	friend size_t hash_value(RecordID const& id);
+	
+	friend std::istream& operator>> (std::istream& strm, RecordID& recordID);
+	friend std::ostream& operator<< (std::ostream& strm, const RecordID& recordID);
 private:    
-    typedef std::array<uint8_t, DB_HEAP_RID_SZ> DataT;
-    DataT data_;
+    boost::uuids::uuid data_;
 };
 
-bool operator==(RecordID const& left, RecordID const& right);
 
-size_t hash_value(RecordID const& id);
-
-#define ROOT_RECORD_ID RecordID()
-#define NULL_RECORD_ID RecordID()
+const RecordID ROOT_RECORD_ID = RecordID::nil();
+const RecordID NULL_RECORD_ID = RecordID::nil();
 
 struct RecordData
 {
@@ -62,8 +68,6 @@ inline Record make_Record(RecordIDT&& id, RecordDataT&& data)
 
 typedef std::vector<Record> Records;
 
-std::istream& operator>> (std::istream& strm, RecordID& recordID);
-std::ostream& operator<< (std::ostream& strm, const RecordID& recordID);
 std::istream& operator>> (std::istream& strm, RecordData::Header& header);
 std::ostream& operator<< (std::ostream& strm, const RecordData::Header& header);
 
@@ -96,6 +100,7 @@ private:
 	mutable Db	dbMain_;
     mutable Db  dbFilename_;
     mutable Db  dbParentId_;
+	thread_local static std::vector<char> buffer_;
 };
 
 #endif	/* DATABASE_HPP */
