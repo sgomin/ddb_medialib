@@ -2,10 +2,9 @@
 
 #include <boost/filesystem.hpp>
 namespace fs = boost::filesystem;
+//#include <boost/archive/binary_iarchive.hpp>
+//#include <boost/archive/binary_oarchive.hpp>
 #include <boost/functional/hash/hash.hpp>
-#include <boost/uuid/nil_generator.hpp>
-#include <boost/uuid/random_generator.hpp>
-#include <boost/uuid/uuid_io.hpp>
 
 #include <strstream>
 #include <sstream>
@@ -15,8 +14,30 @@ const char * const DB_FILE_FILENAME = "filename.db";
 const char * const DB_PARENID_FILENAME = "parentid.db";
 const char FILENAME_DELIMITER = ':';
 
+//namespace boost {
+//namespace serialization {
 
-thread_local std::vector<char> Database::buffer_(256);
+//template<class Archive>
+//void serialize(Archive & ar, Record & r, const unsigned int /*version*/)
+//{
+//	ar & r.parentID;
+//	ar & r.lastWriteTime;
+//    ar & r.fileName;
+//}
+
+//} // namespace serialization
+//} // namespace boost
+
+bool operator==(RecordID const& left, RecordID const& right)
+{
+	return memcmp(left.data(), right.data(), left.size()) == 0;
+}
+
+size_t hash_value(RecordID const& id)
+{
+	return boost::hash_range(id.data(), id.data() + id.size());
+}
+
 
 Database::Database() 
  : env_(0)
@@ -26,24 +47,22 @@ Database::Database()
 {
 	static_assert(std::is_base_of<std::exception, DbException>::value, 
 			"DbException isn't std::exception");
-		
-	env_.set_flags(DB_CDB_ALLDB, /*on*/1);
 }
 
 void Database::open(const std::string& path)
 {
 	fs::create_directory(path);
 	
-	const u_int32_t envFlags = DB_INIT_CDB | DB_INIT_MPOOL | DB_CREATE | DB_THREAD;
+	const u_int32_t envFlags = DB_INIT_CDB | DB_INIT_MPOOL | DB_CREATE;
 	
 	env_.open(path.c_str(), envFlags, /*mode*/0);
 	dbMain_.open(/*txnid*/nullptr, DB_MAIN_FILENAME, 
-		/*database*/nullptr, DB_BTREE, DB_CREATE | DB_THREAD, /*mode*/0);
+		/*database*/nullptr, DB_HEAP, DB_CREATE, /*mode*/0);
 	dbFilename_.open(/*txnid*/nullptr, DB_FILE_FILENAME, 
-		/*database*/nullptr, DB_BTREE, DB_CREATE | DB_THREAD, /*mode*/0);
+		/*database*/nullptr, DB_BTREE, DB_CREATE, /*mode*/0);
 	dbParentId_.set_flags(DB_DUP | DB_DUPSORT);
 	dbParentId_.open(/*txnid*/nullptr, DB_PARENID_FILENAME, 
-		/*database*/nullptr, DB_BTREE, DB_CREATE | DB_THREAD, /*mode*/0);
+		/*database*/nullptr, DB_BTREE, DB_CREATE, /*mode*/0);
 	dbMain_.associate(/*txnid*/nullptr, &dbFilename_, &getFileName, /*flags*/0);
 	dbMain_.associate(/*txnid*/nullptr, &dbParentId_, &getParentId, /*flags*/0);
 }
@@ -60,14 +79,15 @@ RecordData Database::get(const RecordID& id) const
 {
 	Dbt key(id.data(), id.size());
 	Dbt data;
+	thread_local static std::vector<char> buffer(256);
 		
 	while (true)
 	{
 		try
 		{
 			data.set_flags(DB_DBT_USERMEM);
-			data.set_data(buffer_.data());
-			data.set_ulen(buffer_.size());
+			data.set_data(buffer.data());
+			data.set_ulen(buffer.size());
 			const int err = dbMain_.get(/*txnid*/nullptr, &key, &data, /*flags*/0);
 			assert (err == 0);
 			break;
@@ -79,7 +99,7 @@ RecordData Database::get(const RecordID& id) const
 				throw;
 			}
 
-			buffer_.resize(data.get_size() * 1.5);
+			buffer.resize(data.get_size() * 1.5);
 		}
 	}
 	
@@ -88,14 +108,16 @@ RecordData Database::get(const RecordID& id) const
 
 RecordID Database::add(const RecordData& record)
 {
-	RecordID newId = RecordID::generate();
+	RecordID newId;
 	
-	Dbt key(newId.data(), newId.size());
+	Dbt key(newId.data(), 0);
+	key.set_flags(DB_DBT_USERMEM);
+	key.set_ulen(RecordID::size());
 	
 	const std::string str = record.data();
 	Dbt data(const_cast<char*>(str.c_str()), str.size());
 	
-	const int err = dbMain_.put(nullptr, &key, &data, /*flags*/0);
+	const int err = dbMain_.put(nullptr, &key, &data, DB_APPEND);
 	assert (err == 0);
 	assert (key.get_size() == RecordID::size());
 	return newId;
@@ -135,32 +157,11 @@ void Database::del(const RecordID& id)
 
 void Database::replace(const RecordID& id, const RecordData& record)
 {
-	Dbc* pCursor = nullptr;
-	dbMain_.cursor(nullptr, &pCursor, DB_WRITECURSOR);
-	assert(pCursor);
-	
 	Dbt key(id.data(), id.size());
-	Dbt data;
-	
-	int res = pCursor->get(&key, &data, DB_SET);
-	
-	if (res)
-	{
-		pCursor->close();
-		throw DbException("Failed to position cursor", res);
-	}
-	
 	const std::string str = record.data();
-	data.set_data(const_cast<char*>(str.c_str()));
-	data.set_size(str.size());
+	Dbt data(const_cast<char*>(str.c_str()), str.size());
 	
-	res = pCursor->put(&key, &data, DB_CURRENT);
-	pCursor->close();
-	
-	if (res)
-	{
-		throw DbException("Failed to modify data", res);
-	}
+	dbMain_.put(nullptr, &key, &data, DB_APPEND);
 }
 
 Records Database::children(const RecordID& idParent) const
@@ -189,50 +190,23 @@ Records Database::children(const RecordID& idParent) const
 
 Record Database::find(const std::string& fileName) const
 {
-	Dbt fileNameKey(const_cast<char*>(fileName.data()), fileName.size());
-	
-	RecordID id;
-	Dbt key(id.data(), 0);
-	key.set_ulen(RecordID::size());
-	key.set_flags(DB_DBT_USERMEM);
-		
+	Dbt key;
 	Dbt data;
 	
-	while (true)
-	{
-		try
-		{
-			data.set_flags(DB_DBT_USERMEM);
-			data.set_data(buffer_.data());
-			data.set_ulen(buffer_.size());
-			
-			const int err = dbFilename_.pget(nullptr, &fileNameKey, &key, &data, 0);
+	Dbt fileNameKey(const_cast<char*>(fileName.data()), fileName.size());
+	const int err = dbFilename_.pget(nullptr, &fileNameKey, &key, &data, 0);
 	
-			if (err == DB_NOTFOUND)
-			{
-				return make_Record(NULL_RECORD_ID, RecordData());
-			}
-
-			if (err)
-			{
-				throw DbException("Failed to obtain record by filename key", err);
-			}
-			
-			break;
-		}
-		catch(DbException const& ex)
-		{
-			if (ex.get_errno() !=  DB_BUFFER_SMALL)
-			{
-				throw;
-			}
-
-			buffer_.resize(data.get_size() * 1.5);
-		}
+	if (err == DB_NOTFOUND)
+	{
+		return make_Record(NULL_RECORD_ID, RecordData());
 	}
-		
-	assert(key.get_size() == RecordID::size());
-	return make_Record(std::move(id), RecordData(data));
+	
+	if (err)
+	{
+		throw DbException("Failed to obtain record by filename key", err);
+	}
+	
+	return make_Record(RecordID(key), RecordData(data));
 }
 
 //static 
@@ -248,9 +222,14 @@ int Database::getFileName(
 	int cnt = 0;
 	const char * pFilename = std::find_if(pData, pDataEnd, [&cnt](char c)->bool
 	{
-		if (c == ' ' && ++cnt == 3)
+		if (c == ' ')
 		{
-			return true;
+			++cnt;
+			
+			if (cnt == 4)
+			{
+				return true;
+			}
 		}
 		
 		return false;
@@ -289,7 +268,7 @@ int Database::getParentId(
 		static_cast<const char*>(pdata->get_data()), pdata->get_size());
 	
 	RecordID  parentID;
-	strm >> parentID; // Uses the fact that ParentID comes first in the header
+	strm >> parentID;
 	
 	void * pMem = malloc(parentID.size());
 	memcpy(pMem, parentID.data(), parentID.size());
@@ -301,65 +280,51 @@ int Database::getParentId(
 	return 0;
 }
 
-
-// ------ RecordId -------------------------------------------------------------
-
-RecordID::RecordID(const Dbt& dbRec)
-{
-	assert(dbRec.get_size() == size());
-	memcpy(&data_, dbRec.get_data(), dbRec.get_size());
-}
-
-
-// static 
-RecordID RecordID::nil()
-{
-	RecordID nilId;
-	nilId.data_ = boost::uuids::nil_uuid();
-	return nilId;
-}
-
-
-// static 
-RecordID RecordID::generate()
-{
-	static boost::uuids::random_generator gen;
-	RecordID newId;
-	newId.data_ = gen();
-	return newId;
-}
-
-bool operator==(RecordID const& left, RecordID const& right)
-{
-	return left.data_ == right.data_;
-}
-
-
-size_t hash_value(RecordID const& id)
-{
-	return hash_value(id.data_);
-}
-
-
 std::istream& operator>> (std::istream& strm, RecordID& recordID)
 {
-	return strm >> recordID.data_;
+	return strm >> *reinterpret_cast<db_pgno_t*>(recordID.data())
+		>> *reinterpret_cast<db_indx_t*>(recordID.data() + sizeof(db_pgno_t));
 }
 
 std::ostream& operator<< (std::ostream& strm, const RecordID& recordID)
 {
-	return strm << recordID.data_;
+	return strm << *reinterpret_cast<const db_pgno_t*>(recordID.data()) << ' '
+		<< *reinterpret_cast<const db_indx_t*>(recordID.data() + sizeof(db_pgno_t));
 }
 
+std::istream& operator>> (std::istream& strm, RecordData::Header& header)
+{
+	char delim;
+	int isDir;
+	strm >> header.parentID >> header.lastWriteTime >> isDir >> std::ws;
+	header.isDir = !!isDir;
+	return std::getline(strm, header.fileName, FILENAME_DELIMITER).get(delim);
+}
 
-// ------ RecordData -----------------------------------------------------------
+std::ostream& operator<< (std::ostream& strm, const RecordData::Header& header)
+{
+	return strm << header.parentID << ' ' 
+				<< header.lastWriteTime << ' '
+				<< (header.isDir ? 1 : 0) << ' '
+				<< header.fileName << FILENAME_DELIMITER;
+}
+
+RecordID::RecordID()
+{
+	data_.fill(0);
+}
+
+RecordID::RecordID(const Dbt& dbRec)
+{
+	assert(dbRec.get_size() == size());
+	memcpy(data_.data(), dbRec.get_data(), dbRec.get_size());
+}
 
 RecordData::RecordData() :
 	header()
 {
 }
     
-
 RecordData::RecordData(const Dbt& dbRec)
 {
 	std::istrstream strm(
@@ -385,21 +350,4 @@ std::string RecordData::data() const
 	
 	strm << header;
 	return strm.str();
-}
-
-std::istream& operator>> (std::istream& strm, RecordData::Header& header)
-{
-	char delim;
-	int isDir;
-	strm >> header.parentID >> header.lastWriteTime >> isDir >> std::ws;
-	header.isDir = !!isDir;
-	return std::getline(strm, header.fileName, FILENAME_DELIMITER).get(delim);
-}
-
-std::ostream& operator<< (std::ostream& strm, const RecordData::Header& header)
-{
-	return strm << header.parentID << ' ' 
-				<< header.lastWriteTime << ' '
-				<< (header.isDir ? 1 : 0) << ' '
-				<< header.fileName << FILENAME_DELIMITER;
 }
