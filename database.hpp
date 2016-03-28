@@ -10,8 +10,10 @@
 class RecordID
 {
 public:
-    RecordID();
+    RecordID() {}
     explicit RecordID(const Dbt& dbRec);
+	
+	static RecordID nil();
 
     uint8_t * data() const { return const_cast<uint8_t*>(data_.data()); };
     constexpr static size_t size() { return DB_HEAP_RID_SZ; }
@@ -25,8 +27,9 @@ bool operator==(RecordID const& left, RecordID const& right);
 
 size_t hash_value(RecordID const& id);
 
-#define ROOT_RECORD_ID RecordID()
-#define NULL_RECORD_ID RecordID()
+const RecordID NULL_RECORD_ID = RecordID::nil();
+const RecordID ROOT_RECORD_ID = NULL_RECORD_ID;
+
 
 struct RecordData
 {

@@ -2,8 +2,6 @@
 
 #include <boost/filesystem.hpp>
 namespace fs = boost::filesystem;
-//#include <boost/archive/binary_iarchive.hpp>
-//#include <boost/archive/binary_oarchive.hpp>
 #include <boost/functional/hash/hash.hpp>
 
 #include <strstream>
@@ -14,19 +12,6 @@ const char * const DB_FILE_FILENAME = "filename.db";
 const char * const DB_PARENID_FILENAME = "parentid.db";
 const char FILENAME_DELIMITER = ':';
 
-//namespace boost {
-//namespace serialization {
-
-//template<class Archive>
-//void serialize(Archive & ar, Record & r, const unsigned int /*version*/)
-//{
-//	ar & r.parentID;
-//	ar & r.lastWriteTime;
-//    ar & r.fileName;
-//}
-
-//} // namespace serialization
-//} // namespace boost
 
 bool operator==(RecordID const& left, RecordID const& right)
 {
@@ -53,16 +38,18 @@ void Database::open(const std::string& path)
 {
 	fs::create_directory(path);
 	
-	const u_int32_t envFlags = DB_INIT_CDB | DB_INIT_MPOOL | DB_CREATE;
+	const u_int32_t envFlags = DB_INIT_CDB | DB_INIT_MPOOL | DB_THREAD | DB_CREATE;
+	const u_int32_t dbFlags = DB_THREAD | DB_CREATE;
 	
+	env_.set_flags(DB_CDB_ALLDB, /*on*/1);
 	env_.open(path.c_str(), envFlags, /*mode*/0);
 	dbMain_.open(/*txnid*/nullptr, DB_MAIN_FILENAME, 
-		/*database*/nullptr, DB_HEAP, DB_CREATE, /*mode*/0);
+		/*database*/nullptr, DB_HEAP, dbFlags, /*mode*/0);
 	dbFilename_.open(/*txnid*/nullptr, DB_FILE_FILENAME, 
-		/*database*/nullptr, DB_BTREE, DB_CREATE, /*mode*/0);
+		/*database*/nullptr, DB_BTREE, dbFlags, /*mode*/0);
 	dbParentId_.set_flags(DB_DUP | DB_DUPSORT);
 	dbParentId_.open(/*txnid*/nullptr, DB_PARENID_FILENAME, 
-		/*database*/nullptr, DB_BTREE, DB_CREATE, /*mode*/0);
+		/*database*/nullptr, DB_BTREE, dbFlags, /*mode*/0);
 	dbMain_.associate(/*txnid*/nullptr, &dbFilename_, &getFileName, /*flags*/0);
 	dbMain_.associate(/*txnid*/nullptr, &dbParentId_, &getParentId, /*flags*/0);
 }
@@ -161,7 +148,7 @@ void Database::replace(const RecordID& id, const RecordData& record)
 	const std::string str = record.data();
 	Dbt data(const_cast<char*>(str.c_str()), str.size());
 	
-	dbMain_.put(nullptr, &key, &data, DB_APPEND);
+	dbMain_.put(nullptr, &key, &data, /*flags*/0);
 }
 
 Records Database::children(const RecordID& idParent) const
@@ -222,17 +209,7 @@ int Database::getFileName(
 	int cnt = 0;
 	const char * pFilename = std::find_if(pData, pDataEnd, [&cnt](char c)->bool
 	{
-		if (c == ' ')
-		{
-			++cnt;
-			
-			if (cnt == 4)
-			{
-				return true;
-			}
-		}
-		
-		return false;
+		return c == ' ' && ++cnt == 4;
 	});
 	
 	if (pFilename == pDataEnd || pFilename + 1 == pDataEnd)
@@ -309,16 +286,25 @@ std::ostream& operator<< (std::ostream& strm, const RecordData::Header& header)
 				<< header.fileName << FILENAME_DELIMITER;
 }
 
-RecordID::RecordID()
-{
-	data_.fill(0);
-}
+
+// ----- RecordID --------------------------------------------------------------
 
 RecordID::RecordID(const Dbt& dbRec)
 {
 	assert(dbRec.get_size() == size());
 	memcpy(data_.data(), dbRec.get_data(), dbRec.get_size());
 }
+
+// static 
+RecordID RecordID::nil()
+{
+	RecordID nilId;
+	nilId.data_.fill(0);
+	return nilId;
+}
+
+
+// ----- RecordData ------------------------------------------------------------
 
 RecordData::RecordData() :
 	header()
