@@ -114,8 +114,12 @@ try
 		NULL_RECORD_ID, 
 		RecordData(parentID, fs::last_write_time(path), isDir, path.string()));
 
-	const Records::iterator itOldRecord = std::lower_bound(
-		oldRecords.begin(), oldRecords.end(), newRecord, CmpByPath());
+	const std::pair<Records::iterator, Records::iterator> oldRange = 
+		std::equal_range(oldRecords.begin(), oldRecords.end(), newRecord, CmpByPath());
+	assert(std::distance(oldRange.first, oldRange.second) <= 1);
+	
+	const Records::iterator itOldRecord = oldRange.first != oldRange.second ?
+		oldRange.first : oldRecords.end();
 
 	if (isDir && recursive)
 	{
@@ -123,7 +127,7 @@ try
 			itOldRecord->first : db_.add(newRecord.second);
 
 		// if new entry
-		if (itOldRecord == oldRecords.cend())
+		if (itOldRecord == oldRecords.end())
 		{
 			eventSink_.push(ScanEvent{ ScanEvent::ADDED, entryId });
 		}
@@ -141,7 +145,7 @@ try
 			return; // unsupported extension
 		}
 				
-		if (itOldRecord == oldRecords.cend())
+		if (itOldRecord == oldRecords.end())
 		{
 			changed_ = true;
 			newRecord.first = db_.add(newRecord.second);
