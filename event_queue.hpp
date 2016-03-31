@@ -26,7 +26,7 @@ public:
 	
 	Event pop()
 	{
-		std::unique_lock<std::mutex> lock(mutex_);
+		std::lock_guard<std::mutex> lock(mutex_);
 		
 		assert(!queue_.empty());
 		
