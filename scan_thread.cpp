@@ -89,11 +89,26 @@ void ScanThread::scanDir(
 		scanEntry(getPath(entry), dirId, oldRecords, isRecursive(entry));
 	}
 	
+	if (shouldBreak())
+	{
+		return;
+	}
+	
 	for (const Record& missing : oldRecords)
 	{
 		changed_ = true;
-		db_.del(missing.first);
-		eventSink_.push(ScanEvent{ ScanEvent::DELETED, missing.first });
+		
+		try
+		{
+			db_.del(missing.first);
+			eventSink_.push(ScanEvent{ ScanEvent::DELETED, missing.first });
+		}
+		catch(std::exception const& ex)
+		{
+			std::cerr << "Failed to delete DB record for '" 
+					<< missing.second.header.fileName << "' entry: " 
+					<< ex.what() << std::endl;
+		}
 	}
 }
 
@@ -217,11 +232,19 @@ try
 		
 		changed_ = false;
 		
-		scanDir(ROOT_RECORD_ID, 
-				dirs.cbegin(), 
-				dirs.cend(), 
-				/*recursive*/ true,
-				/*forceDeleteMissing*/ true);
+		try
+		{
+			scanDir(ROOT_RECORD_ID, 
+					dirs.cbegin(), 
+					dirs.cend(), 
+					/*recursive*/ true,
+					/*forceDeleteMissing*/ true);
+		}
+		catch(std::exception const& ex)
+		{
+			std::cerr << "Error scanning root directories: " 
+				<< ex.what() << std::endl;
+		}
 		
 		if (!changed_ && !stop_)
 		{

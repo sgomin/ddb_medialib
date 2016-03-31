@@ -121,6 +121,9 @@ void Database::del(const RecordID& id)
 	
 	Dbt keyChild;
 	Dbt record;
+	record.set_flags(DB_DBT_PARTIAL);
+	record.set_doff(0);
+	record.set_dlen(0);
 	
 	int res = pCursor->pget(&key, &keyChild, &record, DB_SET);
 	
@@ -128,6 +131,11 @@ void Database::del(const RecordID& id)
 	{
 		childrenIds.push_back(RecordID(keyChild));
 		res = pCursor->pget(&key, &keyChild, &record, DB_NEXT_DUP);
+	}
+	
+	if (res != DB_NOTFOUND)
+	{
+		throw DbException("Failed to obtain children ids", res);
 	}
 	
 	pCursor->close();
@@ -139,7 +147,14 @@ void Database::del(const RecordID& id)
 	}
 	
 	// delete the record itself
-	dbMain_.del(nullptr, &key, /*flags*/0);
+	const int err = dbMain_.del(nullptr, &key, /*flags*/0);
+	
+	if (err)
+	{
+		std::ostringstream ss;
+		ss << "Failed to delete record id='" << id << '\'';
+		throw DbException(ss.str().c_str(), err);
+	}
 }
 
 void Database::replace(const RecordID& id, const RecordData& record)
