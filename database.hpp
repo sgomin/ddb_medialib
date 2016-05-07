@@ -86,6 +86,9 @@ public:
     Records     children(const RecordID& idParent) const;
     Record      find(const std::string& fileName) const;
     
+    Record      firstDir() const;
+    Record      nextDir(const RecordID& curr) const;
+    
 private:
     static int getFileName(
         Db* sdbp, const Dbt* pkey, const Dbt* pdata, Dbt* skey);

@@ -3,6 +3,7 @@
 #include <boost/filesystem.hpp>
 namespace fs = boost::filesystem;
 #include <boost/functional/hash/hash.hpp>
+#include <boost/scope_exit.hpp>
 
 #include <strstream>
 #include <sstream>
@@ -118,6 +119,11 @@ void Database::del(const RecordID& id)
 	Dbc* pCursor = nullptr;
 	dbParentId_.cursor(NULL, &pCursor, 0);
 	assert(pCursor);
+    
+    BOOST_SCOPE_EXIT(&pCursor) 
+    {
+        if(pCursor) pCursor->close();
+    } BOOST_SCOPE_EXIT_END
 	
 	Dbt keyChild;
 	Dbt record;
@@ -139,6 +145,7 @@ void Database::del(const RecordID& id)
 	}
 	
 	pCursor->close();
+    pCursor = nullptr;
 	
 	// delete children
 	for (const RecordID& childId : childrenIds)
@@ -173,6 +180,11 @@ Records Database::children(const RecordID& idParent) const
 	Dbc* pCursor = nullptr;
 	dbParentId_.cursor(NULL, &pCursor, 0);
 	assert(pCursor);
+    
+    BOOST_SCOPE_EXIT(&pCursor) 
+    {
+        pCursor->close();
+    } BOOST_SCOPE_EXIT_END
 	
 	Dbt keyParent(idParent.data(), idParent.size());
 	Dbt keyChild;
@@ -186,7 +198,6 @@ Records Database::children(const RecordID& idParent) const
 		res = pCursor->pget(&keyParent, &keyChild, &record, DB_NEXT_DUP);
 	}
 	
-	pCursor->close();
 	return result;
 }
 
@@ -210,6 +221,103 @@ Record Database::find(const std::string& fileName) const
 	
 	return make_Record(RecordID(key), RecordData(data));
 }
+
+
+Record Database::firstDir() const
+{
+    Dbc* pCursor = nullptr;
+	dbParentId_.cursor(NULL, &pCursor, 0);
+	assert(pCursor);
+	
+    BOOST_SCOPE_EXIT(&pCursor) 
+    {
+        pCursor->close();
+    } BOOST_SCOPE_EXIT_END
+    
+    RecordID id;
+    
+    Dbt key;
+    Dbt data;
+    
+    key.set_flags(DB_DBT_USERMEM);
+    key.set_data(id.data());
+    key.set_ulen(id.size());
+    
+	do
+    {
+        const int err = pCursor->get(&key, &data, DB_FIRST);
+        
+        if (err == DB_NOTFOUND)
+        {
+            return make_Record(NULL_RECORD_ID, RecordData());
+            pCursor->close();
+        }
+        
+        if (err)
+        {
+            throw DbException("Failed to obtain first directory record", err);
+        }
+	}
+	while (id == ROOT_RECORD_ID);
+    
+    return make_Record(std::move(id), RecordData(data));
+}
+
+
+Record Database::nextDir(const RecordID& curr) const
+{
+    Dbc* pCursor = nullptr;
+	dbParentId_.cursor(NULL, &pCursor, 0);
+	assert(pCursor);
+	
+    BOOST_SCOPE_EXIT(&pCursor) 
+    {
+        pCursor->close();
+    } BOOST_SCOPE_EXIT_END
+    
+    Dbt key;
+    Dbt data;
+    
+    key.set_flags(DB_DBT_PARTIAL);
+    key.set_doff(0);
+    key.set_dlen(0);
+    data.set_flags(DB_DBT_PARTIAL);
+    data.set_doff(0);
+    data.set_dlen(0);
+
+    int err = pCursor->get(&key, &data, DB_SET);
+    
+    if (err == DB_NOTFOUND)
+    {
+        return firstDir();  // ?????
+    }
+    
+    data.set_flags(0);
+    RecordID id;
+    key.set_flags(DB_DBT_USERMEM);
+    key.set_data(id.data());
+    key.set_ulen(id.size());
+    
+	do
+    {
+        err = pCursor->get(&key, &data, DB_NEXT_NODUP);
+        
+        if (err == DB_NOTFOUND)
+        {
+            return make_Record(NULL_RECORD_ID, RecordData());
+            pCursor->close();
+        }
+        
+        if (err)
+        {
+            throw DbException("Failed to obtain first directory record", err);
+        }
+	}
+	while (id == ROOT_RECORD_ID);
+    
+    return make_Record(std::move(id), RecordData(data));
+}
+
 
 //static 
 int Database::getFileName(
