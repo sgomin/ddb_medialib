@@ -87,6 +87,16 @@ void ScanThread::scanDir(
 	for (const auto& entry : entriesRange)
 	{
 		scanEntry(getPath(entry), dirId, oldRecords, isRecursive(entry));
+		
+		if (shouldBreak())
+		{
+			return;
+		}
+		
+		if (!changed_)
+		{
+			std::this_thread::yield();
+		}
 	}
 	
 	if (shouldBreak())
@@ -256,14 +266,14 @@ try
 			
 			cond_.wait_for(fackeLock, sleepTime_);
 			
-			if (sleepTime_ < std::chrono::seconds(2))
+			if (sleepTime_ < std::chrono::seconds(5))
 			{
-				sleepTime_ += std::chrono::milliseconds(100);
-			}
+				sleepTime_ += std::chrono::seconds(1);
+            }
 		}
 		else
 		{
-			sleepTime_ = std::chrono::milliseconds(100);
+			sleepTime_ = std::chrono::seconds(2);
 			std::this_thread::yield();
 		}
 	}
