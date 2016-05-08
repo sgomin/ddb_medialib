@@ -167,7 +167,7 @@ void Database::del(const RecordID& id)
 	// delete the record itself
 	const int err = dbMain_.del(nullptr, &key, /*flags*/0);
 	
-	if (err)
+	if (err && err != DB_NOTFOUND)
 	{
 		std::ostringstream ss;
 		ss << "Failed to delete record id='" << id << '\'';
