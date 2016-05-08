@@ -86,11 +86,6 @@ void MainWidget::fillData(
 		if (rec.second.header.isDir)
 		{
 			fillData(rec.first, (*itRow)->children());
-			
-			if ((*itRow)->children().empty())
-			{
-				pTreeModel_->erase(itRow);
-			}
 		}
 	}
 }
