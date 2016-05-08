@@ -45,15 +45,19 @@ private:
     void scanDir(
             const RecordID& dirId, 
             EntriesIt itEntriesBegin, 
-            EntriesIt itEntriesEnd,
-            bool recursive,
-			bool forceDeleteMissing);
+            EntriesIt itEntriesEnd);
     
     void scanEntry(
             const fs::path& path, 
             const RecordID& parentID, 
             Records& oldRecords,
             bool recursive);
+    
+    void checkDir(Record& recDir);
+    
+    RecordID addEntry(const RecordData& data);
+    void delEntry(const RecordID& id);
+    void replaceEntry(const Record& record);
     
 	bool shouldBreak() const;
 	bool isSupportedExtension(const fs::path& fileName);
@@ -67,7 +71,7 @@ private:
     Database&                   db_;
 	ScanEventQueue&				eventSink_;
 	bool                        changed_ = false;
-	std::chrono::milliseconds	sleepTime_ = std::chrono::milliseconds(100);
+	std::chrono::milliseconds	sleepTime_ = std::chrono::seconds(5);
 };
 
 #endif	/* SCAN_THREAD_HPP */

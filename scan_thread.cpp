@@ -70,9 +70,7 @@ template<typename EntriesIt>
 void ScanThread::scanDir(
             const RecordID& dirId, 
             EntriesIt itEntriesBegin, 
-            EntriesIt itEntriesEnd,
-            bool recursive,
-			bool forceDeleteMissing)
+            EntriesIt itEntriesEnd)
 {
 	if (shouldBreak())
 	{
@@ -92,26 +90,13 @@ void ScanThread::scanDir(
 		{
 			return;
 		}
-		
-		if (!changed_)
-		{
-			std::this_thread::yield();
-		}
-	}
-	
-	if (shouldBreak())
-	{
-		return;
 	}
 	
 	for (const Record& missing : oldRecords)
 	{
-		changed_ = true;
-		
 		try
 		{
-			db_.del(missing.first);
-			eventSink_.push(ScanEvent{ ScanEvent::DELETED, missing.first });
+            delEntry(missing.first);
 		}
 		catch(std::exception const& ex)
 		{
@@ -137,7 +122,7 @@ try
 	const bool isDir = fs::is_directory(path);	
 	Record newRecord = make_Record(
 		NULL_RECORD_ID, 
-		RecordData(parentID, fs::last_write_time(path), isDir, path.string()));
+		RecordData(parentID, /*last write time*/0, isDir, path.string()));
 
 	const std::pair<Records::iterator, Records::iterator> oldRange = 
 		std::equal_range(oldRecords.begin(), oldRecords.end(), newRecord, CmpByPath());
@@ -148,20 +133,11 @@ try
 
 	if (isDir && recursive)
 	{
-		const RecordID entryId = itOldRecord != oldRecords.cend() ?
-			itOldRecord->first : db_.add(newRecord.second);
-
 		// if new entry
 		if (itOldRecord == oldRecords.end())
 		{
-			eventSink_.push(ScanEvent{ ScanEvent::ADDED, entryId });
+            newRecord.first = addEntry(newRecord.second);
 		}
-		
-		scanDir(entryId, 
-				fs::directory_iterator(path), 
-				fs::directory_iterator(), 
-				/*recursive*/ true,
-				/*forceDeleteMissing*/ false);
 	}
 	else // file
 	{
@@ -170,19 +146,17 @@ try
 			return; // unsupported extension
 		}
 				
+        newRecord.second.header.lastWriteTime = fs::last_write_time(path);
+        
 		if (itOldRecord == oldRecords.end())
 		{
-			changed_ = true;
-			newRecord.first = db_.add(newRecord.second);
-			eventSink_.push(ScanEvent{ ScanEvent::ADDED, newRecord.first });
+            newRecord.first = addEntry(newRecord.second);
 		}
 		else if(newRecord.second.header.lastWriteTime != 
 				itOldRecord->second.header.lastWriteTime)
 		{
-			changed_ = true;
 			newRecord.first = itOldRecord->first;
-			db_.replace(newRecord.first, newRecord.second);
-			eventSink_.push(ScanEvent{ ScanEvent::UPDATED, newRecord.first });
+            replaceEntry(newRecord);
 		}
 	}
 	
@@ -225,36 +199,92 @@ bool ScanThread::isSupportedExtension(const fs::path& fileName)
 	return extensions_.find(fileName.extension().string()) != extensions_.end();
 }
 
+void ScanThread::checkDir(Record& recDir)
+try
+{
+    const fs::path dirPath = recDir.second.header.fileName;
+            
+    if(fs::is_directory(dirPath))
+    {              
+        time_t const lastWriteTime = fs::last_write_time(dirPath);
+
+        if(lastWriteTime != recDir.second.header.lastWriteTime)
+        {
+            scanDir(recDir.first, 
+                    fs::directory_iterator(dirPath), 
+                    fs::directory_iterator());
+            recDir.second.header.lastWriteTime = lastWriteTime;
+            db_.replace(recDir.first, recDir.second);
+        }
+    }
+    else
+    {
+        delEntry(recDir.first);
+    }
+}
+catch(const std::exception& ex)
+{
+	std::cerr << "Failed to check dir '" 
+			<< recDir.second.header.fileName << "': " << ex.what() << std::endl;
+}
+
+
+void ScanThread::delEntry(const RecordID& id)
+{
+    changed_ = true;
+    db_.del(id);
+	eventSink_.push(ScanEvent{ ScanEvent::DELETED, id });
+}
+
+
+RecordID ScanThread::addEntry(const RecordData& data)
+{
+    changed_ = true;
+	RecordID id = db_.add(data);
+	eventSink_.push(ScanEvent{ ScanEvent::ADDED, id });
+    return id;
+}
+
+
+void ScanThread::replaceEntry(const Record& record)
+{
+    changed_ = true;
+    db_.replace(record.first, std::move(record.second));
+    eventSink_.push(ScanEvent{ ScanEvent::UPDATED, record.first });
+}
+
 void ScanThread::operator() ()
 try
 {
 	std::clog << "Scanning thread started" << std::endl;
 	
-	Settings::Directories dirs;
-	
 	while (!stop_)
 	{
+        changed_ = false;
+        
 		if (restart_)
-		{
-			dirs = settings_.getSettings().directories;
-			restart_ = false;
+		{ // initially scan directories specified in settings
+			Settings::Directories dirs = settings_.getSettings().directories;
+            restart_ = false;
+			           
+            try
+            {
+                scanDir(ROOT_RECORD_ID, dirs.cbegin(), dirs.cend());
+            }
+            catch(std::exception const& ex)
+            {
+                std::cerr << "Error scanning root directories: " 
+                    << ex.what() << std::endl;
+            }
 		}
 		
-		changed_ = false;
-		
-		try
-		{
-			scanDir(ROOT_RECORD_ID, 
-					dirs.cbegin(), 
-					dirs.cend(), 
-					/*recursive*/ true,
-					/*forceDeleteMissing*/ true);
-		}
-		catch(std::exception const& ex)
-		{
-			std::cerr << "Error scanning root directories: " 
-				<< ex.what() << std::endl;
-		}
+        Record recDir = db_.firstDir();
+        
+        while (recDir.first != NULL_RECORD_ID)
+        {
+            checkDir(recDir);
+            recDir = db_.nextDir(recDir.first);
+        }
 		
 		if (!changed_ && !stop_)
 		{
