@@ -7,11 +7,17 @@ else
     CXXFLAGS += -DNDEBUG -O3
 endif
 
-ddb_misc_medialib.so: database.o main_widget.o medialib.o plugin.o scan_thread.o settings_dlg.o settings.o
-	$(CXX) -o ddb_misc_medialib.so -shared database.o main_widget.o medialib.o plugin.o scan_thread.o settings_dlg.o settings.o $(LIBS)
+ddb_misc_medialib.so: db_record.o database.o db_iterator.o main_widget.o medialib.o plugin.o scan_thread.o settings_dlg.o settings.o
+	$(CXX) -o ddb_misc_medialib.so -shared db_record.o database.o db_iterator.o main_widget.o medialib.o plugin.o scan_thread.o settings_dlg.o settings.o $(LIBS)
 
-database.o: database.cpp database.hpp
+db_record.o: db_record.cpp db_record.hpp
+	$(CXX) $(CXXFLAGS) -Wno-deprecated -c db_record.cpp
+
+database.o: database.cpp database.hpp db_iterator.hpp db_record.hpp
 	$(CXX) $(CXXFLAGS) -Wno-deprecated -c database.cpp
+	
+db_iterator.o: db_iterator.cpp db_iterator.hpp db_record.hpp
+	$(CXX) $(CXXFLAGS) -c db_iterator.cpp
 
 main_widget.o: main_widget.cpp main_widget.hpp event_queue.hpp
 	$(CXX) $(CXXFLAGS) -c main_widget.cpp
@@ -22,7 +28,7 @@ medialib.o: medialib.cpp medialib.h
 plugin.o: plugin.cpp plugin.hpp
 	$(CXX) $(CXXFLAGS) -c plugin.cpp
 
-scan_thread.o: scan_thread.cpp scan_thread.hpp event_queue.hpp
+scan_thread.o: scan_thread.cpp scan_thread.hpp event_queue.hpp db_iterator.hpp
 	$(CXX) $(CXXFLAGS) -c scan_thread.cpp
 
 settings_dlg.o: settings_dlg.cpp settings_dlg.hpp
