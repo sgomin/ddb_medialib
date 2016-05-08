@@ -24,6 +24,7 @@ private:
 };
 
 bool operator==(RecordID const& left, RecordID const& right);
+bool operator!=(RecordID const& left, RecordID const& right);
 
 size_t hash_value(RecordID const& id);
 
@@ -84,15 +85,17 @@ public:
     void        del(const RecordID& id);
     void        replace(const RecordID& id, const RecordData& record);
     Records     children(const RecordID& idParent) const;
-    Record      find(const std::string& fileName) const;
+//    Record      find(const std::string& fileName) const;
     
     Record      firstDir() const;
     Record      nextDir(const RecordID& curr) const;
     
 private:
-    static int getFileName(
-        Db* sdbp, const Dbt* pkey, const Dbt* pdata, Dbt* skey);
+//    static int getFileName(
+//        Db* sdbp, const Dbt* pkey, const Dbt* pdata, Dbt* skey);
     static int getParentId(
+        Db* sdbp, const Dbt* pkey, const Dbt* pdata, Dbt* skey);
+    static int getDirId(
         Db* sdbp, const Dbt* pkey, const Dbt* pdata, Dbt* skey);
     
     static std::string convert(const RecordData& record);
@@ -100,8 +103,9 @@ private:
 private:
     DbEnv       env_;
 	mutable Db	dbMain_;
-    mutable Db  dbFilename_;
+//    mutable Db  dbFilename_;
     mutable Db  dbParentId_;
+    mutable Db  dbDirs_;
 };
 
 #endif	/* DATABASE_HPP */

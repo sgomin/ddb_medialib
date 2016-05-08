@@ -9,14 +9,20 @@ namespace fs = boost::filesystem;
 #include <sstream>
 
 const char * const DB_MAIN_FILENAME = "main.db";
-const char * const DB_FILE_FILENAME = "filename.db";
+//const char * const DB_FILE_FILENAME = "filename.db";
 const char * const DB_PARENID_FILENAME = "parentid.db";
+const char * const DB_DIRS_FILENAME = "dirs.db";
 const char FILENAME_DELIMITER = ':';
 
 
 bool operator==(RecordID const& left, RecordID const& right)
 {
 	return memcmp(left.data(), right.data(), left.size()) == 0;
+}
+
+bool operator!=(RecordID const& left, RecordID const& right)
+{
+    return !(left == right);
 }
 
 size_t hash_value(RecordID const& id)
@@ -28,8 +34,9 @@ size_t hash_value(RecordID const& id)
 Database::Database() 
  : env_(0)
  , dbMain_(&env_, 0)
- , dbFilename_(&env_, 0)
+// , dbFilename_(&env_, 0)
  , dbParentId_(&env_, 0)
+ , dbDirs_(&env_, 0)
 {
 	static_assert(std::is_base_of<std::exception, DbException>::value, 
 			"DbException isn't std::exception");
@@ -46,19 +53,23 @@ void Database::open(const std::string& path)
 	env_.open(path.c_str(), envFlags, /*mode*/0);
 	dbMain_.open(/*txnid*/nullptr, DB_MAIN_FILENAME, 
 		/*database*/nullptr, DB_HEAP, dbFlags, /*mode*/0);
-	dbFilename_.open(/*txnid*/nullptr, DB_FILE_FILENAME, 
-		/*database*/nullptr, DB_BTREE, dbFlags, /*mode*/0);
+//	dbFilename_.open(/*txnid*/nullptr, DB_FILE_FILENAME, 
+//		/*database*/nullptr, DB_BTREE, dbFlags, /*mode*/0);
 	dbParentId_.set_flags(DB_DUP | DB_DUPSORT);
 	dbParentId_.open(/*txnid*/nullptr, DB_PARENID_FILENAME, 
 		/*database*/nullptr, DB_BTREE, dbFlags, /*mode*/0);
-	dbMain_.associate(/*txnid*/nullptr, &dbFilename_, &getFileName, /*flags*/0);
+    dbDirs_.open(/*txnid*/nullptr, DB_DIRS_FILENAME, 
+		/*database*/nullptr, DB_BTREE, dbFlags, /*mode*/0);
+//	dbMain_.associate(/*txnid*/nullptr, &dbFilename_, &getFileName, /*flags*/0);
 	dbMain_.associate(/*txnid*/nullptr, &dbParentId_, &getParentId, /*flags*/0);
+    dbMain_.associate(/*txnid*/nullptr, &dbDirs_, &getDirId, /*flags*/0);
 }
 
 void Database::close()
 {
+    dbDirs_.close(0);
 	dbParentId_.close(0);
-	dbFilename_.close(0);
+//	dbFilename_.close(0);
 	dbMain_.close(0);
 	env_.close(0);
 }
@@ -201,6 +212,7 @@ Records Database::children(const RecordID& idParent) const
 	return result;
 }
 
+#if 0
 Record Database::find(const std::string& fileName) const
 {
 	Dbt key;
@@ -221,12 +233,12 @@ Record Database::find(const std::string& fileName) const
 	
 	return make_Record(RecordID(key), RecordData(data));
 }
-
+#endif
 
 Record Database::firstDir() const
 {
     Dbc* pCursor = nullptr;
-	dbParentId_.cursor(NULL, &pCursor, 0);
+	dbDirs_.cursor(NULL, &pCursor, 0);
 	assert(pCursor);
 	
     BOOST_SCOPE_EXIT(&pCursor) 
@@ -243,22 +255,16 @@ Record Database::firstDir() const
     key.set_data(id.data());
     key.set_ulen(id.size());
     
-	do
+    const int err = pCursor->get(&key, &data, DB_FIRST);
+    
+    if (err == DB_NOTFOUND)
     {
-        const int err = pCursor->get(&key, &data, DB_FIRST);
-        
-        if (err == DB_NOTFOUND)
-        {
-            return make_Record(NULL_RECORD_ID, RecordData());
-            pCursor->close();
-        }
-        
-        if (err)
-        {
-            throw DbException("Failed to obtain first directory record", err);
-        }
-	}
-	while (id == ROOT_RECORD_ID);
+        return make_Record(NULL_RECORD_ID, RecordData());
+    }
+    else if (err)
+    {
+        throw DbException("Failed to obtain first directory record", err);
+    }
     
     return make_Record(std::move(id), RecordData(data));
 }
@@ -267,7 +273,7 @@ Record Database::firstDir() const
 Record Database::nextDir(const RecordID& curr) const
 {
     Dbc* pCursor = nullptr;
-	dbParentId_.cursor(NULL, &pCursor, 0);
+	dbDirs_.cursor(NULL, &pCursor, 0);
 	assert(pCursor);
 	
     BOOST_SCOPE_EXIT(&pCursor) 
@@ -275,12 +281,9 @@ Record Database::nextDir(const RecordID& curr) const
         pCursor->close();
     } BOOST_SCOPE_EXIT_END
     
-    Dbt key;
+    Dbt key(curr.data(), curr.size());
     Dbt data;
     
-    key.set_flags(DB_DBT_PARTIAL);
-    key.set_doff(0);
-    key.set_dlen(0);
     data.set_flags(DB_DBT_PARTIAL);
     data.set_doff(0);
     data.set_dlen(0);
@@ -291,6 +294,10 @@ Record Database::nextDir(const RecordID& curr) const
     {
         return firstDir();  // ?????
     }
+    else if (err)
+    {
+        throw DbException("Failed to set cursor to directory record", err);
+    }
     
     data.set_flags(0);
     RecordID id;
@@ -298,27 +305,21 @@ Record Database::nextDir(const RecordID& curr) const
     key.set_data(id.data());
     key.set_ulen(id.size());
     
-	do
+	err = pCursor->get(&key, &data, DB_NEXT_NODUP);
+        
+    if (err == DB_NOTFOUND)
     {
-        err = pCursor->get(&key, &data, DB_NEXT_NODUP);
-        
-        if (err == DB_NOTFOUND)
-        {
-            return make_Record(NULL_RECORD_ID, RecordData());
-            pCursor->close();
-        }
-        
-        if (err)
-        {
-            throw DbException("Failed to obtain first directory record", err);
-        }
-	}
-	while (id == ROOT_RECORD_ID);
+        return make_Record(NULL_RECORD_ID, RecordData());
+    }
+    else if (err)
+    {
+        throw DbException("Failed to obtain next directory record", err);
+    }
     
     return make_Record(std::move(id), RecordData(data));
 }
 
-
+#if 0
 //static 
 int Database::getFileName(
 	Db */*sdbp*/, const Dbt */*pkey*/, const Dbt *pdata, Dbt *skey)
@@ -356,6 +357,7 @@ int Database::getFileName(
 	
 	return 0;
 }
+#endif
 
 //static 
 int Database::getParentId(
@@ -379,6 +381,33 @@ int Database::getParentId(
 	
 	return 0;
 }
+
+
+//static 
+int Database::getDirId(
+        Db* sdbp, const Dbt* pkey, const Dbt* pdata, Dbt* skey)
+{
+    assert(pdata);
+	assert(skey);
+	
+	std::istrstream strm(
+		static_cast<const char*>(pdata->get_data()), pdata->get_size());
+	
+	RecordID  parentID;
+	time_t lastWriteTime;
+    int isDir;
+	strm >> parentID >> lastWriteTime >> isDir;
+	
+    if (!isDir)
+    {
+        return DB_DONOTINDEX;
+    }
+	
+	skey->set_data(pkey->get_data());
+    skey->set_size(pkey->get_size());
+	return 0;
+}
+
 
 std::istream& operator>> (std::istream& strm, RecordID& recordID)
 {
