@@ -28,7 +28,7 @@ private:
 
     void increment();
     bool equal(db_iterator const& other) const;
-    const Record& dereference() const { return record_; }
+    const Record& dereference() const;
     
     Dbc* pCursor_;
     Record record_;

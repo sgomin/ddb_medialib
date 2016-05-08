@@ -147,3 +147,10 @@ bool db_iterator::equal(db_iterator const& other) const
     assert(!err);
     return result == 0;
 }
+
+
+const Record& db_iterator::dereference() const 
+{ 
+    assert(pCursor_);
+    return record_; 
+}
