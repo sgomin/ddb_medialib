@@ -321,10 +321,16 @@ db_iterator Database::dirs_begin() const
     
     const int err = pCursor->get(&key, &data, DB_FIRST);
     
-    if (err && err != DB_NOTFOUND)
+    if (err)
     {
         pCursor->close();
-        throw DbException("Failed to obtain first directory record", err);
+        
+        if (err != DB_NOTFOUND)
+        {
+            throw DbException("Failed to obtain first directory record", err);
+        }
+        
+        return dirs_end();
     }
     
     return db_iterator(pCursor);
