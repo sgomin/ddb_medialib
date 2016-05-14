@@ -136,7 +136,7 @@ try
 		// if new entry
 		if (itOldRecord == oldRecords.end())
 		{
-            newRecord.first = addEntry(newRecord.second);
+            addEntry(std::move(newRecord.second));
 		}
 	}
 	else // file
@@ -150,13 +150,13 @@ try
         
 		if (itOldRecord == oldRecords.end())
 		{
-            newRecord.first = addEntry(newRecord.second);
+            addEntry(std::move(newRecord.second));
 		}
 		else if(newRecord.second.header.lastWriteTime != 
 				itOldRecord->second.header.lastWriteTime)
 		{
 			newRecord.first = itOldRecord->first;
-            replaceEntry(newRecord);
+            replaceEntry(std::move(newRecord));
 		}
 	}
 	
@@ -199,7 +199,7 @@ bool ScanThread::isSupportedExtension(const fs::path& fileName)
 	return extensions_.find(fileName.extension().string()) != extensions_.end();
 }
 
-void ScanThread::checkDir(Record& recDir)
+void ScanThread::checkDir(const Record& recDir)
 try
 {
     const fs::path dirPath = recDir.second.header.fileName;
@@ -210,11 +210,14 @@ try
 
         if(lastWriteTime != recDir.second.header.lastWriteTime)
         {
+            RecordData newData = recDir.second;
+            
+            newData.header.lastWriteTime = lastWriteTime;
+            replaceEntry(make_Record(recDir.first, std::move(newData)));
+            
             scanDir(recDir.first, 
                     fs::directory_iterator(dirPath), 
                     fs::directory_iterator());
-            recDir.second.header.lastWriteTime = lastWriteTime;
-            db_.replace(recDir.first, recDir.second);
         }
     }
     else
@@ -232,25 +235,21 @@ catch(const std::exception& ex)
 void ScanThread::delEntry(const RecordID& id)
 {
     changed_ = true;
-    db_.del(id);
-	eventSink_.push(ScanEvent{ ScanEvent::DELETED, id });
+    changes_.deleted.push_back(id);
 }
 
 
-RecordID ScanThread::addEntry(const RecordData& data)
+void ScanThread::addEntry(RecordData&& data)
 {
     changed_ = true;
-	RecordID id = db_.add(data);
-	eventSink_.push(ScanEvent{ ScanEvent::ADDED, id });
-    return id;
+    changes_.added.push_back(std::move(data));
 }
 
 
-void ScanThread::replaceEntry(const Record& record)
+void ScanThread::replaceEntry(Record&& record)
 {
     changed_ = true;
-    db_.replace(record.first, std::move(record.second));
-    eventSink_.push(ScanEvent{ ScanEvent::UPDATED, record.first });
+    changes_.changed.push_back(std::move(record));
 }
 
 void ScanThread::operator() ()
@@ -270,6 +269,7 @@ try
             try
             {
                 scanDir(ROOT_RECORD_ID, dirs.cbegin(), dirs.cend());
+                saveChangesToDB();
             }
             catch(std::exception const& ex)
             {
@@ -278,14 +278,9 @@ try
             }
 		}
 		
-        Record recDir = db_.firstDir();
+        scanDirs();
+        saveChangesToDB();
         
-        while (recDir.first != NULL_RECORD_ID)
-        {
-            checkDir(recDir);
-            recDir = db_.nextDir(recDir.first);
-        }
-		
 		if (!changed_ && !stop_)
 		{
 			struct FackeLock 
@@ -324,4 +319,47 @@ catch(...)
 bool ScanThread::shouldBreak() const
 {
 	return stop_ || restart_;
+}
+
+
+void ScanThread::scanDirs()
+{
+    db_iterator const itDirsEnd = db_.dirs_end();
+        
+    for (db_iterator itDir = db_.dirs_begin(); itDir != itDirsEnd; ++itDir)
+    {
+        checkDir(*itDir);
+    }
+}
+
+
+void ScanThread::saveChangesToDB()
+{
+    for (RecordData& data : changes_.added)
+    {
+        RecordID id = db_.add(std::move(data));
+        eventSink_.push(ScanEvent{ ScanEvent::ADDED, std::move(id) });
+    }
+    
+    for (Record& record : changes_.changed)
+    {
+        db_.replace(record.first, std::move(record.second));
+        eventSink_.push(ScanEvent{ ScanEvent::UPDATED, std::move(record.first) });
+    }
+    
+    for (RecordID& id : changes_.deleted)
+    {
+        db_.del(id);
+    	eventSink_.push(ScanEvent{ ScanEvent::DELETED, std::move(id) });
+    }
+    
+    changes_.clear();
+}
+
+
+void ScanThread::Changes::clear()
+{
+    deleted.clear();
+    changed.clear();
+    added.clear();
 }

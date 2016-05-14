@@ -53,14 +53,17 @@ private:
             Records& oldRecords,
             bool recursive);
     
-    void checkDir(Record& recDir);
+    void checkDir(const Record& recDir);
     
-    RecordID addEntry(const RecordData& data);
+    void addEntry(RecordData&& data);
     void delEntry(const RecordID& id);
-    void replaceEntry(const Record& record);
-    
+    void replaceEntry(Record&& record);
+        
 	bool shouldBreak() const;
 	bool isSupportedExtension(const fs::path& fileName);
+    
+    void scanDirs();
+    void saveChangesToDB();
     
 	std::thread					thread_;
 	std::condition_variable_any	cond_;
@@ -72,6 +75,15 @@ private:
 	ScanEventQueue&				eventSink_;
 	bool                        changed_ = false;
 	std::chrono::milliseconds	sleepTime_ = std::chrono::seconds(5);
+    
+    struct Changes
+    {
+        void clear();
+        
+        std::vector<RecordID>   deleted;
+        std::vector<Record>     changed;
+        std::vector<RecordData> added;
+    } changes_;
 };
 
 #endif	/* SCAN_THREAD_HPP */
