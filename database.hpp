@@ -27,9 +27,6 @@ public:
     Records     children(const RecordID& idParent) const;
 //    Record      find(const std::string& fileName) const;
     
-    Record      firstDir() const;
-    Record      nextDir(const RecordID& curr) const;
-    
     db_iterator dirs_begin() const;
     db_iterator dirs_end() const;
     

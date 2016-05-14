@@ -217,90 +217,6 @@ Record Database::find(const std::string& fileName) const
 }
 #endif
 
-Record Database::firstDir() const
-{
-    Dbc* pCursor = nullptr;
-	dbDirs_.cursor(NULL, &pCursor, 0);
-	assert(pCursor);
-	
-    BOOST_SCOPE_EXIT(&pCursor) 
-    {
-        pCursor->close();
-    } BOOST_SCOPE_EXIT_END
-    
-    RecordID id;
-    
-    Dbt key;
-    Dbt data;
-    
-    key.set_flags(DB_DBT_USERMEM);
-    key.set_data(id.data());
-    key.set_ulen(id.size());
-    
-    const int err = pCursor->get(&key, &data, DB_FIRST);
-    
-    if (err == DB_NOTFOUND)
-    {
-        return make_Record(NULL_RECORD_ID, RecordData());
-    }
-    else if (err)
-    {
-        throw DbException("Failed to obtain first directory record", err);
-    }
-    
-    return make_Record(std::move(id), RecordData(data));
-}
-
-
-Record Database::nextDir(const RecordID& curr) const
-{
-    Dbc* pCursor = nullptr;
-	dbDirs_.cursor(NULL, &pCursor, 0);
-	assert(pCursor);
-	
-    BOOST_SCOPE_EXIT(&pCursor) 
-    {
-        pCursor->close();
-    } BOOST_SCOPE_EXIT_END
-    
-    Dbt key(curr.data(), curr.size());
-    Dbt data;
-    
-    data.set_flags(DB_DBT_PARTIAL);
-    data.set_doff(0);
-    data.set_dlen(0);
-
-    int err = pCursor->get(&key, &data, DB_SET);
-    
-    if (err == DB_NOTFOUND)
-    {
-        return firstDir();  // ?????
-    }
-    else if (err)
-    {
-        throw DbException("Failed to set cursor to directory record", err);
-    }
-    
-    data.set_flags(0);
-    RecordID id;
-    key.set_flags(DB_DBT_USERMEM);
-    key.set_data(id.data());
-    key.set_ulen(id.size());
-    
-	err = pCursor->get(&key, &data, DB_NEXT_NODUP);
-        
-    if (err == DB_NOTFOUND)
-    {
-        return make_Record(NULL_RECORD_ID, RecordData());
-    }
-    else if (err)
-    {
-        throw DbException("Failed to obtain next directory record", err);
-    }
-    
-    return make_Record(std::move(id), RecordData(data));
-}
-
 
 db_iterator Database::dirs_begin() const
 {
@@ -308,16 +224,13 @@ db_iterator Database::dirs_begin() const
 	dbDirs_.cursor(NULL, &pCursor, 0);
 	assert(pCursor);
 	
+    RecordID id;
     Dbt key;
     Dbt data;
     
-    key.set_flags(DB_DBT_PARTIAL);
-    key.set_doff(0);
-    key.set_dlen(0);
-    
-    data.set_flags(DB_DBT_PARTIAL);
-    data.set_doff(0);
-    data.set_dlen(0);
+    key.set_flags(DB_DBT_USERMEM);
+    key.set_data(id.data());
+    key.set_ulen(id.size());
     
     const int err = pCursor->get(&key, &data, DB_FIRST);
     
@@ -333,13 +246,13 @@ db_iterator Database::dirs_begin() const
         return dirs_end();
     }
     
-    return db_iterator(pCursor);
+    return db_iterator(pCursor, make_Record(std::move(id), RecordData(data)));
 }
 
 
 db_iterator Database::dirs_end() const
 {
-    return db_iterator(nullptr);
+    return db_iterator(nullptr, make_Record(NULL_RECORD_ID, RecordData()));
 }
 
 

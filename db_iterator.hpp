@@ -14,11 +14,11 @@ class db_iterator
       , boost::forward_traversal_tag>
 {
 public:
-    explicit db_iterator(Dbc* pCursor);
+    explicit db_iterator(Dbc* pCursor, Record&& record);
     db_iterator(const db_iterator& orig);
     db_iterator(db_iterator&& orig);
     
-    virtual ~db_iterator();
+    ~db_iterator();
     
     db_iterator& operator=(const db_iterator& orig);
     db_iterator& operator=(db_iterator&& orig);

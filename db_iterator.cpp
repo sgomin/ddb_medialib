@@ -4,36 +4,10 @@
 #include <db_cxx.h>
 #include <assert.h>
 
-db_iterator::db_iterator(Dbc* pCursor)
+db_iterator::db_iterator(Dbc* pCursor, Record&& record)
     : pCursor_(pCursor)
+    , record_(std::move(record))
 {
-    if (pCursor_)
-    {
-        RecordID id;
-
-        Dbt key;
-        Dbt data;
-        key.set_flags(DB_DBT_USERMEM);
-        key.set_data(id.data());
-        key.set_ulen(id.size());
-
-        int err = pCursor_->get(&key, &data, DB_CURRENT);
-
-        if (err == DB_NOTFOUND) // reached end
-        {
-            pCursor_->close();
-            pCursor_ = nullptr;
-            record_ = Record();
-        }
-        else if (err)
-        {
-            throw DbException("Failed to advanse cursor", err);
-        }
-        else
-        {
-            record_ = make_Record(std::move(id), RecordData(data));
-        }
-    }
 }
 
 
@@ -88,11 +62,11 @@ db_iterator& db_iterator::operator=(db_iterator&& orig)
     if(pCursor_)
     {
         pCursor_->close();
+        pCursor_ = nullptr;
     }
     
-    pCursor_ = orig.pCursor_;
+    std::swap(pCursor_, orig.pCursor_);
     record_ = std::move(orig.record_);
-    orig.pCursor_ = nullptr;
     return *this;
 }
 
@@ -117,7 +91,7 @@ void db_iterator::increment()
         {
             pCursor_->close();
             pCursor_ = nullptr;
-            record_ = Record();
+            record_ = make_Record(NULL_RECORD_ID, RecordData());
         }
         else if (err)
         {
@@ -133,19 +107,7 @@ void db_iterator::increment()
 
 bool db_iterator::equal(db_iterator const& other) const
 {
-    if (!pCursor_)
-    {
-        return other.pCursor_ == nullptr;
-    }
-    else if (!other.pCursor_)
-    {
-        return false;
-    }
-    
-    int result = -1;
-    int err = pCursor_->cmp(other.pCursor_, &result, /*flags*/0);
-    assert(!err);
-    return result == 0;
+    return record_.first == other.record_.first;
 }
 
 
