@@ -33,7 +33,7 @@ public:
     ScanThread(const SettingsProvider& settings,
 			   const Extensions& extensions,
                Database& db,
-			   ScanEventQueue& eventSink);
+			   ScanEventSink eventSink);
     ~ScanThread();
     
 	void restart();
@@ -72,7 +72,7 @@ private:
     const SettingsProvider&		settings_;
     const Extensions			extensions_;
     Database&                   db_;
-	ScanEventQueue&				eventSink_;
+	ScanEventSink				eventSink_;
 	bool                        changed_ = false;
 	std::chrono::milliseconds	sleepTime_ = std::chrono::seconds(5);
     

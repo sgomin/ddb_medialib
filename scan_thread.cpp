@@ -9,7 +9,7 @@ ScanThread::ScanThread(
 		const SettingsProvider& settings,
 		const Extensions& extensions,
 		Database& db,
-		ScanEventQueue& eventSink)
+		ScanEventSink eventSink)
  : stop_(false)
  , restart_(true)
  , settings_(settings)
@@ -326,7 +326,9 @@ void ScanThread::scanDirs()
 {
     db_iterator const itDirsEnd = db_.dirs_end();
         
-    for (db_iterator itDir = db_.dirs_begin(); itDir != itDirsEnd; ++itDir)
+    for (db_iterator itDir = db_.dirs_begin(); 
+         itDir != itDirsEnd && !shouldBreak(); 
+                                      ++itDir)
     {
         checkDir(*itDir);
     }
@@ -337,18 +339,24 @@ void ScanThread::saveChangesToDB()
 {
     for (RecordData& data : changes_.added)
     {
+        if (shouldBreak()) break;
+        
         RecordID id = db_.add(std::move(data));
         eventSink_.push(ScanEvent{ ScanEvent::ADDED, std::move(id) });
     }
     
     for (Record& record : changes_.changed)
     {
+        if (shouldBreak()) break;
+        
         db_.replace(record.first, std::move(record.second));
         eventSink_.push(ScanEvent{ ScanEvent::UPDATED, std::move(record.first) });
     }
     
     for (RecordID& id : changes_.deleted)
     {
+        if (shouldBreak()) break;
+        
         db_.del(id);
     	eventSink_.push(ScanEvent{ ScanEvent::DELETED, std::move(id) });
     }

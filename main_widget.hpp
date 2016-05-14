@@ -14,10 +14,9 @@
 class MainWidget : public Gtk::EventBox
 {
 public:
-    MainWidget(Database & db);
+    MainWidget(Database & db, ScanEventSource scanEventSource);
 	~MainWidget() override;
     
-	ScanEventQueue eventQueue_;
 	
 private:
 	// signal handlers
@@ -40,6 +39,7 @@ private:
 		boost::hash<RecordID>> FileToRowMap;
 	
 	Database &						db_;
+    ScanEventSource                 scanEventSource_;
     Gtk::VBox						sidebar_;
 	Gtk::HBox						firstRow_;
 	Gtk::ComboBoxText				styleCombo_;

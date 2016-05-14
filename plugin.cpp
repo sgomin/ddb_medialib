@@ -43,6 +43,7 @@ private:
 	typedef std::unique_ptr<ScanThread> ScanThreadPtr;
 	
     Glib::RefPtr<Gtk::Application>      app_;
+    static ScanEventQueue               eventQueue_;
     static ddb_gtkui_t              *   pGtkUi_;
     const fs::path                      fnSettings_;
 	static SettingsProvider             settings_;
@@ -50,6 +51,7 @@ private:
 	static ScanThreadPtr				pScanThread_;
 };
 
+ScanEventQueue                  Plugin::Impl::eventQueue_;
 ddb_gtkui_t *					Plugin::Impl::pGtkUi_ = nullptr;
 SettingsProvider				Plugin::Impl::settings_;
 Database						Plugin::Impl::db_;
@@ -252,14 +254,14 @@ try
     ddb_gtkui_widget_t *w = 
             static_cast<ddb_gtkui_widget_t*>(malloc(sizeof(ddb_gtkui_widget_t)));
     memset(w, 0, sizeof (*w));
-    MainWidget * pMainWidget = new MainWidget(db_);
+    MainWidget * pMainWidget = new MainWidget(db_, eventQueue_);
 	
 	std::clog << "[" PLUGIN_NAME " ] Starting scan thread " << std::endl;
 	pScanThread_.reset(new ScanThread(
 						settings_, 
 						getSupportedExtensions(), 
 						db_,
-						pMainWidget->eventQueue_));
+						eventQueue_));
 	
     w->widget = GTK_WIDGET( pMainWidget->gobj() );
     w->destroy = &destroyWidget;

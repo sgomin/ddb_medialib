@@ -16,8 +16,9 @@ struct ByDirectoryColumns : Gtk::TreeModel::ColumnRecord
 static const ByDirectoryColumns byDirColumns;
 
 
-MainWidget::MainWidget(Database & db)
+MainWidget::MainWidget(Database & db, ScanEventSource scanEventSource)
  : db_(db)
+ , scanEventSource_(scanEventSource)
  , settingsBtn_("Settings")
 {
     styleCombo_.append("By directory structure");
@@ -184,9 +185,9 @@ catch(const std::exception& e)
 
 bool MainWidget::onIdle()
 {
-	while (!eventQueue_.empty())
+	while (!scanEventSource_.empty())
 	{
-		ScanEvent e = eventQueue_.pop();
+		ScanEvent e = scanEventSource_.pull();
 		
 		switch(e.type)
 		{

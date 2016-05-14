@@ -1,5 +1,5 @@
 CXXFLAGS += -I$(DEADBEEF_DIR) -std=c++11 -fPIC $$(pkg-config --cflags gtkmm-3.0)
-LIBS += $$(pkg-config --libs gtkmm-3.0) -ldb_cxx -lboost_system -lboost_exception -lboost_filesystem
+LIBS += $$(pkg-config --libs gtkmm-3.0) -ldb_cxx -lboost_system -lboost_exception -lboost_thread -lboost_filesystem
 
 ifdef DEBUG
     CXXFLAGS += -DDEBUG -ggdb3 -Wall
@@ -19,7 +19,7 @@ database.o: database.cpp database.hpp db_iterator.hpp db_record.hpp
 db_iterator.o: db_iterator.cpp db_iterator.hpp db_record.hpp
 	$(CXX) $(CXXFLAGS) -c db_iterator.cpp
 
-main_widget.o: main_widget.cpp main_widget.hpp event_queue.hpp
+main_widget.o: main_widget.cpp main_widget.hpp
 	$(CXX) $(CXXFLAGS) -c main_widget.cpp
 
 medialib.o: medialib.cpp medialib.h
@@ -28,7 +28,7 @@ medialib.o: medialib.cpp medialib.h
 plugin.o: plugin.cpp plugin.hpp
 	$(CXX) $(CXXFLAGS) -c plugin.cpp
 
-scan_thread.o: scan_thread.cpp scan_thread.hpp event_queue.hpp db_iterator.hpp
+scan_thread.o: scan_thread.cpp scan_thread.hpp db_iterator.hpp db_record.hpp
 	$(CXX) $(CXXFLAGS) -c scan_thread.cpp
 
 settings_dlg.o: settings_dlg.cpp settings_dlg.hpp
