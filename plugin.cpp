@@ -261,7 +261,8 @@ try
 						settings_, 
 						getSupportedExtensions(), 
 						db_,
-						eventQueue_));
+						eventQueue_,
+                        pMainWidget->getOnChangedDisp()));
 	
     w->widget = GTK_WIDGET( pMainWidget->gobj() );
     w->destroy = &destroyWidget;

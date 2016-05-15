@@ -16,6 +16,7 @@ namespace fs = boost::filesystem;
 #include <condition_variable>
 
 #include <db_cxx.h>
+#include <glibmm/dispatcher.h>
 
 struct CaseCompare
 {
@@ -33,7 +34,8 @@ public:
     ScanThread(const SettingsProvider& settings,
 			   const Extensions& extensions,
                Database& db,
-			   ScanEventSink eventSink);
+			   ScanEventSink eventSink,
+               Glib::Dispatcher& onChangedDisp);
     ~ScanThread();
     
 	void restart();
@@ -73,6 +75,7 @@ private:
     const Extensions			extensions_;
     Database&                   db_;
 	ScanEventSink				eventSink_;
+    Glib::Dispatcher&           onChangedDisp_;
 	bool                        changed_ = false;
 	std::chrono::milliseconds	sleepTime_ = std::chrono::seconds(5);
     

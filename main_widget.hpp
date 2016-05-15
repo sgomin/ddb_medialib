@@ -10,6 +10,7 @@
 #include <unordered_map>
 
 #include <gtkmm.h>
+#include <glibmm/dispatcher.h>
 
 class MainWidget : public Gtk::EventBox
 {
@@ -17,14 +18,14 @@ public:
     MainWidget(Database & db, ScanEventSource scanEventSource);
 	~MainWidget() override;
     
-	
+	Glib::Dispatcher& getOnChangedDisp() { return onChangesDisp_; }
 private:
 	// signal handlers
     void onSettings();
 	void onRowActivated(
 			const Gtk::TreeModel::Path& path, 
 			Gtk::TreeViewColumn* column);
-	bool onIdle();
+	void onChanged();
 	
 	// auxiliary functions
 	void fillData(const RecordID& from, const Gtk::TreeModel::Children& to);
@@ -48,7 +49,8 @@ private:
 	Gtk::TreeView					treeVeiew_;
 	Glib::RefPtr<Gtk::TreeStore>	pTreeModel_;
 	FileToRowMap					file2row_;
-	sigc::connection				idleConnection_;
+    Glib::Dispatcher                onChangesDisp_;
+	sigc::connection				changeConnection_;
 };
 
 

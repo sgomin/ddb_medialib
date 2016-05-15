@@ -50,14 +50,14 @@ MainWidget::MainWidget(Database & db, ScanEventSource scanEventSource)
     add(sidebar_);
     show_all();
 	
-	idleConnection_ = Glib::signal_idle().connect(
-			sigc::mem_fun(*this, &MainWidget::onIdle));
+	changeConnection_ = onChangesDisp_.connect(
+			sigc::mem_fun(*this, &MainWidget::onChanged));
 }
 
 
 MainWidget::~MainWidget()
 {
-	idleConnection_.disconnect();
+	changeConnection_.disconnect();
 }
 
 
@@ -183,7 +183,7 @@ catch(const std::exception& e)
 }
 
 
-bool MainWidget::onIdle()
+void MainWidget::onChanged()
 {
 	while (!scanEventSource_.empty())
 	{
@@ -203,8 +203,6 @@ bool MainWidget::onIdle()
 			break;
 		}
 	}
-	
-	return true;
 }
 
 void MainWidget::delRec(const RecordID& id)

@@ -9,13 +9,15 @@ ScanThread::ScanThread(
 		const SettingsProvider& settings,
 		const Extensions& extensions,
 		Database& db,
-		ScanEventSink eventSink)
+		ScanEventSink eventSink,
+        Glib::Dispatcher& onChangedDisp)
  : stop_(false)
  , restart_(true)
  , settings_(settings)
  , extensions_(extensions)
  , db_(db)
  , eventSink_(eventSink)
+ , onChangedDisp_(onChangedDisp)
 {
 	thread_ = std::thread(std::ref(*this));
 }
@@ -362,6 +364,11 @@ void ScanThread::saveChangesToDB()
     }
     
     changes_.clear();
+    
+    if (!eventSink_.empty())
+    {
+        onChangedDisp_();
+    }
 }
 
 
