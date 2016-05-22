@@ -11,16 +11,12 @@
 
 #include <boost/filesystem.hpp>
 namespace fs = boost::filesystem;
-#include <boost/property_tree/ptree.hpp>
-#include <boost/property_tree/json_parser.hpp>
-#include <boost/foreach.hpp>
+
 
 #include <iostream>
 #include <memory.h>
 
 const std::string	CONFIG_FILENAME = "medialib";
-const std::string	CONFIG_DIRECTORIES_KEY = "directories";
-const std::string	CONFIG_RECURSIVE_KEY = "recursive";
 const std::string	DB_DIR = "medialibdb";
 
 
@@ -123,25 +119,8 @@ Plugin::Impl::Impl()
  : app_(Gtk::Application::create())
  , fnSettings_(fs::path(deadbeef->get_config_dir()) / CONFIG_FILENAME)
 {
-	using boost::property_tree::ptree;
-	using namespace boost::property_tree::json_parser;
-	
 	Settings settings;
-	
-	ptree tree;
-	read_json(fnSettings_.string(), tree);
-	ptree::assoc_iterator itDirs = tree.find(CONFIG_DIRECTORIES_KEY);
-
-	if (itDirs != tree.not_found())
-	{
-		for (auto dir : itDirs->second)
-		{
-			Settings::Directory dirSettings;
-			dirSettings.recursive = dir.second.get(CONFIG_RECURSIVE_KEY, true);
-			settings.directories[dir.first] = std::move(dirSettings);
-		}
-	}
-	
+	settings.load(fnSettings_.string());
 	settings_.setSettings(std::move(settings));
 }
 
@@ -298,22 +277,7 @@ Settings Plugin::Impl::getSettings() const
     
 void Plugin::Impl::storeSettings(Settings settings)
 {
-	using boost::property_tree::ptree;
-	using namespace boost::property_tree::json_parser;
-	
-	ptree treeMain;
-	ptree::iterator itDirs = treeMain.push_back(
-			std::make_pair(CONFIG_DIRECTORIES_KEY, ptree()));
-	
-	for (auto dir : settings.directories)
-	{
-		ptree::iterator itDir = itDirs->second.push_back(
-				std::make_pair(dir.first, ptree()));
-		
-		itDir->second.put(CONFIG_RECURSIVE_KEY, dir.second.recursive);
-	}
-	
-    write_json(fnSettings_.string(), treeMain);
+	settings.save(fnSettings_.string());
 	settings_.setSettings(std::move(settings));
 	pScanThread_->restart();
 }

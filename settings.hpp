@@ -11,6 +11,9 @@ struct Settings
     {
         bool recursive;
     };
+    
+    void load(std::string const& fileName);
+    void save(std::string const& fileName);
  
     typedef std::map<std::string, Directory> Directories;
     Directories directories;
