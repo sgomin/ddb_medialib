@@ -1,9 +1,7 @@
 #ifndef SETTINGS_DLG_HPP
 #define	SETTINGS_DLG_HPP
 
-#include "plugin.hpp"
-
-#include <set>
+#include "settings.hpp"
 
 #include <gtkmm.h>
 

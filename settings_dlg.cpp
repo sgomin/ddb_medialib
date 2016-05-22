@@ -1,5 +1,7 @@
 #include "settings_dlg.hpp"
 
+#include <vector>
+
 SettingsDlg::SettingsDlg(Settings & settings) :
     Gtk::Dialog("Settings", /*modal*/ true),
     settings_(settings),
