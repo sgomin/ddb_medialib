@@ -45,6 +45,7 @@ private:
 	static SettingsProvider             settings_;
 	static Database						db_;
 	static ScanThreadPtr				pScanThread_;
+    static MainWidget               *   pMainWidget_;
 };
 
 ScanEventQueue                  Plugin::Impl::eventQueue_;
@@ -52,6 +53,7 @@ ddb_gtkui_t *					Plugin::Impl::pGtkUi_ = nullptr;
 SettingsProvider				Plugin::Impl::settings_;
 Database						Plugin::Impl::db_;
 Plugin::Impl::ScanThreadPtr		Plugin::Impl::pScanThread_;
+MainWidget *                    Plugin::Impl::pMainWidget_ = nullptr;
 std::unique_ptr<Plugin::Impl>	Plugin::s_pImpl;
 
 //static 
@@ -210,6 +212,7 @@ try
 	pScanThread_.reset();
 	std::clog << "[" PLUGIN_NAME " ] Closing database " << std::endl;
 	db_.close();
+    pMainWidget_->onDisconnect();
 	return 0;
 }
 catch(const DbException & ex)
@@ -233,7 +236,7 @@ try
     ddb_gtkui_widget_t *w = 
             static_cast<ddb_gtkui_widget_t*>(malloc(sizeof(ddb_gtkui_widget_t)));
     memset(w, 0, sizeof (*w));
-    MainWidget * pMainWidget = new MainWidget(db_, eventQueue_);
+    pMainWidget_ = new MainWidget(db_, eventQueue_, deadbeef->get_config_dir());
 	
 	std::clog << "[" PLUGIN_NAME " ] Starting scan thread " << std::endl;
 	pScanThread_.reset(new ScanThread(
@@ -241,9 +244,9 @@ try
 						getSupportedExtensions(), 
 						db_,
 						eventQueue_,
-                        pMainWidget->getOnChangedDisp()));
+                        pMainWidget_->getOnChangedDisp()));
 	
-    w->widget = GTK_WIDGET( pMainWidget->gobj() );
+    w->widget = GTK_WIDGET( pMainWidget_->gobj() );
     w->destroy = &destroyWidget;
 	pGtkUi_->w_override_signals (w->widget, w);
     return w;
@@ -264,10 +267,11 @@ catch(const std::exception & ex)
 // static 
 void Plugin::Impl::destroyWidget(ddb_gtkui_widget_t * w)
 {
-	std::clog << "[" PLUGIN_NAME " ] Stopping scan thread " << std::endl;
+    std::clog << "[" PLUGIN_NAME " ] Stopping scan thread " << std::endl;
 	pScanThread_.reset();
     std::clog << "[" PLUGIN_NAME " ] Destroying widget " << std::endl;
     delete Glib::wrap(w->widget);
+    pMainWidget_ = nullptr;
 }
 
 Settings Plugin::Impl::getSettings() const

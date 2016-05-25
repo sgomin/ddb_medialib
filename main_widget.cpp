@@ -3,8 +3,7 @@
 #include "settings_dlg.hpp"
 #include "medialib.h"
 
-#include <boost/filesystem.hpp>
-namespace fs = boost::filesystem;
+#include <fstream>
 
 struct ByDirectoryColumns : Gtk::TreeModel::ColumnRecord
 {
@@ -16,10 +15,14 @@ struct ByDirectoryColumns : Gtk::TreeModel::ColumnRecord
 static const ByDirectoryColumns byDirColumns;
 
 
-MainWidget::MainWidget(Database & db, ScanEventSource scanEventSource)
+MainWidget::MainWidget(
+        Database & db, 
+        ScanEventSource scanEventSource,
+        fs::path const& configDir)
  : db_(db)
  , scanEventSource_(scanEventSource)
  , settingsBtn_("Settings")
+ , expandRowsFileName_((configDir / "expanded_rorws").string())
 {
     styleCombo_.append("By directory structure");
     styleCombo_.set_active(0);
@@ -48,6 +51,7 @@ MainWidget::MainWidget(Database & db, ScanEventSource scanEventSource)
 	sidebar_.pack_start(firstRow_, Gtk::PACK_SHRINK);
 	sidebar_.pack_start(scrolledWindow_, Gtk::PACK_EXPAND_WIDGET);
     add(sidebar_);
+    restoreExpandedRows();
     show_all();
 	
 	changeConnection_ = onChangesDisp_.connect(
@@ -57,7 +61,40 @@ MainWidget::MainWidget(Database & db, ScanEventSource scanEventSource)
 
 MainWidget::~MainWidget()
 {
-	changeConnection_.disconnect();
+    changeConnection_.disconnect();
+}
+
+
+void MainWidget::saveExpandedRows()
+{
+    std::ofstream expRowsFile(
+        expandRowsFileName_, std::ios_base::out | std::ios_base::trunc);
+    
+    treeVeiew_.map_expanded_rows(
+    [&expRowsFile](Gtk::TreeView* tree_view, const Gtk::TreeModel::Path& path)
+    {
+        expRowsFile << path.to_string() << std::endl;
+    });
+}
+
+
+void MainWidget::restoreExpandedRows()
+{
+    std::ifstream expRowsFile(expandRowsFileName_);
+    char buff[256];
+    
+    while (expRowsFile.getline(buff, sizeof(buff)))
+    {
+        Glib::ustring const str(buff, expRowsFile.gcount() - 1);
+        Gtk::TreeModel::Path const path(str);
+        treeVeiew_.expand_row(path, /*expand all*/false);
+    }
+}
+
+
+void MainWidget::onDisconnect()
+{
+    saveExpandedRows();
 }
 
 

@@ -6,6 +6,8 @@
 #include "scan_event.hpp"
 
 #include <boost/functional/hash.hpp>
+#include <boost/filesystem.hpp>
+namespace fs = boost::filesystem;
 
 #include <unordered_map>
 
@@ -15,10 +17,15 @@
 class MainWidget : public Gtk::EventBox
 {
 public:
-    MainWidget(Database & db, ScanEventSource scanEventSource);
+    MainWidget(
+            Database & db, 
+            ScanEventSource scanEventSource,
+            fs::path const& configDir);
 	~MainWidget() override;
     
 	Glib::Dispatcher& getOnChangedDisp() { return onChangesDisp_; }
+    void onDisconnect();
+    
 private:
 	// signal handlers
     void onSettings();
@@ -26,6 +33,7 @@ private:
 			const Gtk::TreeModel::Path& path, 
 			Gtk::TreeViewColumn* column);
 	void onChanged();
+    
 	
 	// auxiliary functions
 	void fillData(const RecordID& from, const Gtk::TreeModel::Children& to);
@@ -33,6 +41,8 @@ private:
 	void delRec(const RecordID& id);
 	void addRec(const RecordID& id);
 	void onPreDeleteRow(Gtk::TreeModel::Row const& row);
+    void saveExpandedRows();
+    void restoreExpandedRows();
     
 	typedef std::unordered_map<
 		RecordID, 
@@ -51,6 +61,7 @@ private:
 	FileToRowMap					file2row_;
     Glib::Dispatcher                onChangesDisp_;
 	sigc::connection				changeConnection_;
+    std::string const               expandRowsFileName_;
 };
 
 
