@@ -363,6 +363,8 @@ void ScanThread::saveChangesToDB()
     	eventSink_.push(ScanEvent{ ScanEvent::DELETED, std::move(id) });
     }
     
+    if (shouldBreak()) return;
+    
     changes_.clear();
     
     if (!eventSink_.empty())
