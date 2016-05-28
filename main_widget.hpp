@@ -21,7 +21,7 @@ public:
             Database & db, 
             ScanEventSource scanEventSource,
             fs::path const& configDir);
-	~MainWidget() override;
+	virtual ~MainWidget() override;
     
 	Glib::Dispatcher& getOnChangedDisp() { return onChangesDisp_; }
     void onDisconnect();
@@ -32,11 +32,17 @@ private:
 	void onRowActivated(
 			const Gtk::TreeModel::Path& path, 
 			Gtk::TreeViewColumn* column);
+    void onDragDataGet(
+            const Glib::RefPtr<Gdk::DragContext>& context,
+            Gtk::SelectionData& selection_data, 
+            guint info, 
+            guint time);
 	void onChanged();
     
 	
 	// auxiliary functions
 	void fillData(const RecordID& from, const Gtk::TreeModel::Children& to);
+    void setupTreeView();
 	void fillRow(Gtk::TreeModel::iterator itRow, Record const& rec);
 	void delRec(const RecordID& id);
 	void addRec(const RecordID& id);

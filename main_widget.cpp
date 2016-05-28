@@ -39,11 +39,7 @@ MainWidget::MainWidget(
 	file2row_.insert(std::make_pair(ROOT_RECORD_ID, 
 		Gtk::TreeModel::RowReference(pTreeModel_, Gtk::TreeModel::Path("0"))));
 	fillData(ROOT_RECORD_ID, pTreeModel_->children());
-	treeVeiew_.set_model(pTreeModel_);
-	treeVeiew_.append_column("File Name", byDirColumns.filename);
-	treeVeiew_.set_headers_visible(false);
-	treeVeiew_.signal_row_activated().connect(
-            sigc::mem_fun(*this, &MainWidget::onRowActivated));
+	setupTreeView();
     
 	scrolledWindow_.set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);
     scrolledWindow_.add(treeVeiew_);
@@ -62,13 +58,33 @@ MainWidget::MainWidget(
 MainWidget::~MainWidget()
 {
     changeConnection_.disconnect();
+    saveExpandedRows();
+}
+
+
+void MainWidget::setupTreeView()
+{
+    treeVeiew_.set_model(pTreeModel_);
+	treeVeiew_.append_column("File Name", byDirColumns.filename);
+	treeVeiew_.set_headers_visible(false);
+	treeVeiew_.signal_row_activated().connect(
+            sigc::mem_fun(*this, &MainWidget::onRowActivated));
+    
+    // Drag'n'drop
+    std::vector<Gtk::TargetEntry> targets =
+        { Gtk::TargetEntry("text/uri-list", Gtk::TARGET_SAME_APP) };
+    
+    treeVeiew_.drag_source_set(targets, Gdk::BUTTON1_MASK, 
+        Gdk::ACTION_COPY | Gdk::ACTION_MOVE);
+    treeVeiew_.drag_dest_add_uri_targets();
+    treeVeiew_.signal_drag_data_get().connect(
+        sigc::mem_fun(*this, &MainWidget::onDragDataGet));
 }
 
 
 void MainWidget::saveExpandedRows()
 {
-    std::ofstream expRowsFile(
-        expandRowsFileName_, std::ios_base::out | std::ios_base::trunc);
+    std::ofstream expRowsFile(expandRowsFileName_);
     
     treeVeiew_.map_expanded_rows(
     [&expRowsFile](Gtk::TreeView* tree_view, const Gtk::TreeModel::Path& path)
@@ -217,6 +233,37 @@ try
 catch(const std::exception& e)
 {
 	std::cerr << "Failed to add file to playlist: " << e.what() << std::endl;
+}
+
+
+void MainWidget::onDragDataGet(
+        const Glib::RefPtr<Gdk::DragContext>& context,
+        Gtk::SelectionData& selection_data, 
+        guint /*info*/, 
+        guint /*time*/)
+try
+{
+    Glib::RefPtr<Gtk::TreeSelection> pSelection = treeVeiew_.get_selection();
+    Glib::ustring uris;
+    
+    pSelection->selected_foreach_iter(
+        [this, &uris](const Gtk::TreeModel::iterator& itRow)
+        {
+            RecordData const rec = db_.get((*itRow)[byDirColumns.fileId]);
+
+            if (uris.empty())
+            {
+                uris += ' ';
+            }
+            
+            uris += Glib::filename_to_uri(rec.header.fileName);
+        });
+        
+    selection_data.set(selection_data.get_target(), uris);
+}
+catch(const Glib::Exception& e)
+{
+	std::cerr << "Failed to drag'n'drop file to playlist: " << e.what() << std::endl;
 }
 
 
