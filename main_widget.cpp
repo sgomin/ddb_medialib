@@ -67,7 +67,9 @@ void MainWidget::setupTreeView()
     treeVeiew_.set_model(pTreeModel_);
 	treeVeiew_.append_column("File Name", byDirColumns.filename);
 	treeVeiew_.set_headers_visible(false);
-    treeVeiew_.signal_row_activated().connect(
+// TODO: support multi-line drag'n'drop 
+//    treeVeiew_.get_selection()->set_mode(Gtk::SELECTION_MULTIPLE);
+	treeVeiew_.signal_row_activated().connect(
             sigc::mem_fun(*this, &MainWidget::onRowActivated));
     
     // Drag'n'drop
@@ -75,8 +77,7 @@ void MainWidget::setupTreeView()
         { Gtk::TargetEntry("text/uri-list", 
                 Gtk::TARGET_SAME_APP | Gtk::TARGET_OTHER_WIDGET) };
     
-    treeVeiew_.drag_source_set(targets, Gdk::BUTTON1_MASK, 
-        Gdk::ACTION_COPY | Gdk::ACTION_MOVE);
+    treeVeiew_.enable_model_drag_source(targets);
     treeVeiew_.signal_drag_data_get().connect(
         sigc::mem_fun(*this, &MainWidget::onDragDataGet));
 }
