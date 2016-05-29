@@ -67,16 +67,16 @@ void MainWidget::setupTreeView()
     treeVeiew_.set_model(pTreeModel_);
 	treeVeiew_.append_column("File Name", byDirColumns.filename);
 	treeVeiew_.set_headers_visible(false);
-	treeVeiew_.signal_row_activated().connect(
+    treeVeiew_.signal_row_activated().connect(
             sigc::mem_fun(*this, &MainWidget::onRowActivated));
     
     // Drag'n'drop
     std::vector<Gtk::TargetEntry> targets =
-        { Gtk::TargetEntry("text/uri-list", Gtk::TARGET_SAME_APP) };
+        { Gtk::TargetEntry("text/uri-list", 
+                Gtk::TARGET_SAME_APP | Gtk::TARGET_OTHER_WIDGET) };
     
     treeVeiew_.drag_source_set(targets, Gdk::BUTTON1_MASK, 
         Gdk::ACTION_COPY | Gdk::ACTION_MOVE);
-    treeVeiew_.drag_dest_add_uri_targets();
     treeVeiew_.signal_drag_data_get().connect(
         sigc::mem_fun(*this, &MainWidget::onDragDataGet));
 }
