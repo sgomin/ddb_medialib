@@ -1,4 +1,4 @@
-CXXFLAGS += -I$(DEADBEEF_DIR) -std=c++11 -fPIC $$(pkg-config --cflags gtkmm-3.0)
+CXXFLAGS += -std=c++11 -fPIC $$(pkg-config --cflags gtkmm-3.0)
 LIBS += $$(pkg-config --libs gtkmm-3.0) -ldb_cxx -lboost_system -lboost_exception -lboost_thread -lboost_filesystem
 
 ifdef DEBUG
@@ -39,9 +39,13 @@ settings.o: settings.cpp settings.hpp
 
 all: ddb_misc_medialib.so
 
-install: ddb_misc_medialib.so
+local_install: ddb_misc_medialib.so
 	mkdir -p $$HOME/.local/lib/deadbeef
 	cp -f ddb_misc_medialib.so $$HOME/.local/lib/deadbeef
+	
+install: ddb_misc_medialib.so
+	mkdir -p /opt/deadbeef/lib/deadbeef
+	cp -f ddb_misc_medialib.so /opt/deadbeef/lib/deadbeef
 
 clean:
 	$(RM) *.o

@@ -3,9 +3,6 @@
 
 #include <iostream>
 
-#define DB_API_VERSION_MAJOR 1
-#define DB_API_VERSION_MINOR 7
-
 #define PLUGIN_VERSION_MAJOR    0
 #define PLUGIN_VERSION_MINOR    1
 
