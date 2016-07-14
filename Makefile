@@ -44,8 +44,8 @@ local_install: ddb_misc_medialib.so
 	cp -f ddb_misc_medialib.so $$HOME/.local/lib/deadbeef
 	
 install: ddb_misc_medialib.so
-	mkdir -p /opt/deadbeef/lib/deadbeef
-	cp -f ddb_misc_medialib.so /opt/deadbeef/lib/deadbeef
+	mkdir -p $(DESTDIR)/opt/deadbeef/lib/deadbeef
+	cp -f ddb_misc_medialib.so $(DESTDIR)/opt/deadbeef/lib/deadbeef
 
 clean:
 	$(RM) *.o
