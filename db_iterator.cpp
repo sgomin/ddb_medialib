@@ -45,7 +45,7 @@ void db_file_iterator::readNextRecord()
         return;
     }
     
-    auto res = sqlite3_step(pCursor_);
+    auto const res = sqlite3_step(pCursor_);
     
     if (res == SQLITE_DONE)
     {
@@ -55,19 +55,21 @@ void db_file_iterator::readNextRecord()
     {
         throw DbException(res);
     }
-    
-    rec_.first = sqlite3_column_int64(pCursor_, 0);
-    rec_.second.parentID = sqlite3_column_int64(pCursor_, 1);
-    rec_.second.lastWriteTime = sqlite3_column_int64(pCursor_, 2);
-    rec_.second.isDir = sqlite3_column_int(pCursor_, 3) != 0;
-    auto const * pFileName = sqlite3_column_text(pCursor_, 4);
-    
-    if (pFileName)
-    {
-        rec_.second.fileName = reinterpret_cast<const char*>(pFileName);
-    }
     else
     {
-        rec_.second.fileName.clear();
+        rec_.first = sqlite3_column_int64(pCursor_, 0);
+        rec_.second.parentID = sqlite3_column_int64(pCursor_, 1);
+        rec_.second.lastWriteTime = sqlite3_column_int64(pCursor_, 2);
+        rec_.second.isDir = sqlite3_column_int(pCursor_, 3) != 0;
+        auto const * pFileName = sqlite3_column_text(pCursor_, 4);
+
+        if (pFileName)
+        {
+            rec_.second.fileName = reinterpret_cast<const char*>(pFileName);
+        }
+        else
+        {
+            rec_.second.fileName.clear();
+        }
     }
 }

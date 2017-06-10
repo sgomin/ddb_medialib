@@ -212,6 +212,7 @@ FileInfo DbReader::getFile(const RecordID& id) const
         rec.fileName = reinterpret_cast<const char*>(pFileName);
     }
     
+    CHECK_SQLITE(sqlite3_reset(pStmt));
     return rec;
 }
 
@@ -274,6 +275,7 @@ sqlite3_stmt* StatementCache::get(int id, const char* szSQL)
     }
     else
     {
+        assert(sqlite3_stmt_busy(pStmt) == 0);
         CHECK_SQLITE(sqlite3_reset(pStmt));
     }
     

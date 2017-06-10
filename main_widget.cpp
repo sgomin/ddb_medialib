@@ -130,6 +130,8 @@ void MainWidget::onSettings()
 void MainWidget::fillData(
 		const RecordID& from, const Gtk::TreeModel::Children& to)
 {
+    std::set<RecordID> subdirIDs;
+    
 	for (FileRecord const& rec : db_.childrenFiles(from))
 	{
 		Gtk::TreeModel::iterator itRow = pTreeModel_->append(to);
@@ -138,9 +140,19 @@ void MainWidget::fillData(
 		
 		if (rec.second.isDir)
 		{
-			fillData(rec.first, (*itRow)->children());
+			subdirIDs.insert(rec.first);
 		}
 	}
+    
+    for (auto itRow = to.begin(); itRow != to.end(); ++itRow)
+    {
+        RecordID id = (*itRow)[byDirColumns.fileId];
+        
+        if (subdirIDs.count(id))
+        {
+            fillData(id, (*itRow)->children());
+        }
+    }
 }
 
 
