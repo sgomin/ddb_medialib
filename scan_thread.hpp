@@ -15,7 +15,6 @@ namespace fs = boost::filesystem;
 #include <thread>
 #include <condition_variable>
 
-#include <db_cxx.h>
 #include <glibmm/dispatcher.h>
 
 struct CaseCompare
@@ -33,7 +32,7 @@ class ScanThread
 public:
     ScanThread(const SettingsProvider& settings,
 			   const Extensions& extensions,
-               Database& db,
+               DbOwnerPtr&& db,
 			   ScanEventSink eventSink,
                Glib::Dispatcher& onChangedDisp);
     ~ScanThread();
@@ -52,14 +51,14 @@ private:
     void scanEntry(
             const fs::path& path, 
             const RecordID& parentID, 
-            Records& oldRecords,
+            FileRecords& oldRecords,
             bool recursive);
     
-    void checkDir(const Record& recDir);
+    void checkDir(const FileRecord& recDir);
     
-    void addEntry(RecordData&& data);
+    void addEntry(FileInfo&& data);
     void delEntry(const RecordID& id);
-    void replaceEntry(Record&& record);
+    void replaceEntry(FileRecord&& record);
         
 	bool shouldBreak() const;
 	bool isSupportedExtension(const fs::path& fileName);
@@ -73,7 +72,7 @@ private:
 	std::atomic<bool>			restart_;
     const SettingsProvider&		settings_;
     const Extensions			extensions_;
-    Database&                   db_;
+    DbOwnerPtr                  db_;
 	ScanEventSink				eventSink_;
     Glib::Dispatcher&           onChangedDisp_;
 	bool                        changed_ = false;
@@ -84,8 +83,8 @@ private:
         void clear();
         
         std::vector<RecordID>   deleted;
-        std::vector<Record>     changed;
-        std::vector<RecordData> added;
+        std::vector<FileRecord> changed;
+        std::vector<FileInfo>   added;
     } changes_;
 };
 

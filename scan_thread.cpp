@@ -8,14 +8,14 @@
 ScanThread::ScanThread(
 		const SettingsProvider& settings,
 		const Extensions& extensions,
-		Database& db,
+		DbOwnerPtr&& db,
 		ScanEventSink eventSink,
         Glib::Dispatcher& onChangedDisp)
  : stop_(false)
  , restart_(true)
  , settings_(settings)
  , extensions_(extensions)
- , db_(db)
+ , db_(std::move(db))
  , eventSink_(eventSink)
  , onChangedDisp_(onChangedDisp)
 {
@@ -59,9 +59,9 @@ bool isRecursive(const Settings::Directories::value_type& dirEntry)
 
 struct CmpByPath
 {
-	bool operator() (const Record& left, const Record& right) const
+	bool operator() (const FileRecord& left, const FileRecord& right) const
 	{
-		return left.second.header.fileName < right.second.header.fileName;
+		return left.second.fileName < right.second.fileName;
 	}
 };
 
@@ -79,7 +79,9 @@ void ScanThread::scanDir(
 		return;
 	}
 	
-	Records oldRecords = db_.children(dirId);
+    auto rangeOldRecords = db_->childrenFiles(dirId);
+	FileRecords oldRecords{ rangeOldRecords.begin(), rangeOldRecords.end() };
+    
 	std::sort(oldRecords.begin(), oldRecords.end(), CmpByPath());
 		
 	auto entriesRange = boost::make_iterator_range(itEntriesBegin, itEntriesEnd);
@@ -94,7 +96,7 @@ void ScanThread::scanDir(
 		}
 	}
 	
-	for (const Record& missing : oldRecords)
+	for (const FileRecord& missing : oldRecords)
 	{
 		try
 		{
@@ -103,7 +105,7 @@ void ScanThread::scanDir(
 		catch(std::exception const& ex)
 		{
 			std::cerr << "Failed to delete DB record for '" 
-					<< missing.second.header.fileName << "' entry: " 
+					<< missing.second.fileName << "' entry: " 
 					<< ex.what() << std::endl;
 		}
 	}
@@ -112,7 +114,7 @@ void ScanThread::scanDir(
 void ScanThread::scanEntry(
 			const fs::path& path, 
 			const RecordID& parentID, 
-			Records& oldRecords,
+			FileRecords& oldRecords,
 			bool recursive)
 try
 {
@@ -122,15 +124,15 @@ try
 	}
 	
 	const bool isDir = fs::is_directory(path);	
-	Record newRecord = make_Record(
+	FileRecord newRecord = make_Record(
 		NULL_RECORD_ID, 
-		RecordData(parentID, /*last write time*/0, isDir, path.string()));
+		FileInfo{ parentID, /*last write time*/0, isDir, path.string() });
 
-	const std::pair<Records::iterator, Records::iterator> oldRange = 
+	const std::pair<FileRecords::iterator, FileRecords::iterator> oldRange = 
 		std::equal_range(oldRecords.begin(), oldRecords.end(), newRecord, CmpByPath());
 	assert(std::distance(oldRange.first, oldRange.second) <= 1);
 	
-	const Records::iterator itOldRecord = oldRange.first != oldRange.second ?
+	const FileRecords::iterator itOldRecord = oldRange.first != oldRange.second ?
 		oldRange.first : oldRecords.end();
 
 	if (isDir && recursive)
@@ -148,14 +150,14 @@ try
 			return; // unsupported extension
 		}
 				
-        newRecord.second.header.lastWriteTime = fs::last_write_time(path);
+        newRecord.second.lastWriteTime = fs::last_write_time(path);
         
 		if (itOldRecord == oldRecords.end())
 		{
             addEntry(std::move(newRecord.second));
 		}
-		else if(newRecord.second.header.lastWriteTime != 
-				itOldRecord->second.header.lastWriteTime)
+		else if(newRecord.second.lastWriteTime != 
+				itOldRecord->second.lastWriteTime)
 		{
 			newRecord.first = itOldRecord->first;
             replaceEntry(std::move(newRecord));
@@ -177,9 +179,9 @@ catch(const fs::filesystem_error& ex)
 	// it shouldn't be deleted from the database
 	if (ex.code().value() != ENOENT)
 	{
-		const Record fakeRecord = make_Record(NULL_RECORD_ID, 
-						RecordData(NULL_RECORD_ID, 0, false, path.string()));
-		const Records::iterator itOldRecord = std::lower_bound(
+		const FileRecord fakeRecord = make_Record(NULL_RECORD_ID, 
+						FileInfo{ NULL_RECORD_ID, 0, false, path.string() });
+		const FileRecords::iterator itOldRecord = std::lower_bound(
 			oldRecords.begin(), oldRecords.end(), fakeRecord, CmpByPath());
 		
 		// prevent record from deletion
@@ -201,20 +203,20 @@ bool ScanThread::isSupportedExtension(const fs::path& fileName)
 	return extensions_.find(fileName.extension().string()) != extensions_.end();
 }
 
-void ScanThread::checkDir(const Record& recDir)
+void ScanThread::checkDir(const FileRecord& recDir)
 try
 {
-    const fs::path dirPath = recDir.second.header.fileName;
+    const fs::path dirPath = recDir.second.fileName;
             
     if(fs::is_directory(dirPath))
     {              
         time_t const lastWriteTime = fs::last_write_time(dirPath);
 
-        if(lastWriteTime != recDir.second.header.lastWriteTime)
+        if(lastWriteTime != recDir.second.lastWriteTime)
         {
-            RecordData newData = recDir.second;
+            FileInfo newData = recDir.second;
             
-            newData.header.lastWriteTime = lastWriteTime;
+            newData.lastWriteTime = lastWriteTime;
             replaceEntry(make_Record(recDir.first, std::move(newData)));
             
             scanDir(recDir.first, 
@@ -230,7 +232,7 @@ try
 catch(const std::exception& ex)
 {
 	std::cerr << "Failed to check dir '" 
-			<< recDir.second.header.fileName << "': " << ex.what() << std::endl;
+			<< recDir.second.fileName << "': " << ex.what() << std::endl;
 }
 
 
@@ -241,14 +243,14 @@ void ScanThread::delEntry(const RecordID& id)
 }
 
 
-void ScanThread::addEntry(RecordData&& data)
+void ScanThread::addEntry(FileInfo&& data)
 {
     changed_ = true;
     changes_.added.push_back(std::move(data));
 }
 
 
-void ScanThread::replaceEntry(Record&& record)
+void ScanThread::replaceEntry(FileRecord&& record)
 {
     changed_ = true;
     changes_.changed.push_back(std::move(record));
@@ -326,32 +328,33 @@ bool ScanThread::shouldBreak() const
 
 void ScanThread::scanDirs()
 {
-    db_iterator const itDirsEnd = db_.dirs_end();
-        
-    for (db_iterator itDir = db_.dirs_begin(); 
-         itDir != itDirsEnd && !shouldBreak(); 
-                                      ++itDir)
+    for (auto dir : db_->dirs())
     {
-        checkDir(*itDir);
+        if (shouldBreak())
+        {
+            break;
+        }
+        
+        checkDir(dir);
     }
 }
 
 
 void ScanThread::saveChangesToDB()
 {
-    for (RecordData& data : changes_.added)
+    for (FileInfo& data : changes_.added)
     {
         if (shouldBreak()) break;
         
-        RecordID id = db_.add(std::move(data));
+        RecordID id = db_->addFile(std::move(data));
         eventSink_.push(ScanEvent{ ScanEvent::ADDED, std::move(id) });
     }
     
-    for (Record& record : changes_.changed)
+    for (FileRecord& record : changes_.changed)
     {
         if (shouldBreak()) break;
         
-        db_.replace(record.first, std::move(record.second));
+        db_->replaceFile(record.first, std::move(record.second));
         eventSink_.push(ScanEvent{ ScanEvent::UPDATED, std::move(record.first) });
     }
     
@@ -359,7 +362,7 @@ void ScanThread::saveChangesToDB()
     {
         if (shouldBreak()) break;
         
-        db_.del(id);
+        db_->delFile(id);
     	eventSink_.push(ScanEvent{ ScanEvent::DELETED, std::move(id) });
     }
     

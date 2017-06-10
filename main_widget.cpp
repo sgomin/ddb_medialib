@@ -16,10 +16,10 @@ static const ByDirectoryColumns byDirColumns;
 
 
 MainWidget::MainWidget(
-        Database & db, 
+        DbReader&& db, 
         ScanEventSource scanEventSource,
         fs::path const& configDir)
- : db_(db)
+ : db_(std::move(db))
  , scanEventSource_(scanEventSource)
  , settingsBtn_("Settings")
  , expandRowsFileName_((configDir / "expanded_rorws").string())
@@ -130,15 +130,13 @@ void MainWidget::onSettings()
 void MainWidget::fillData(
 		const RecordID& from, const Gtk::TreeModel::Children& to)
 {
-	Records children = db_.children(from);
-	
-	for (Record const& rec : children)
+	for (FileRecord const& rec : db_.childrenFiles(from))
 	{
 		Gtk::TreeModel::iterator itRow = pTreeModel_->append(to);
 		
 		fillRow(itRow, rec);
 		
-		if (rec.second.header.isDir)
+		if (rec.second.isDir)
 		{
 			fillData(rec.first, (*itRow)->children());
 		}
@@ -146,11 +144,11 @@ void MainWidget::fillData(
 }
 
 
-void MainWidget::fillRow(Gtk::TreeModel::iterator itRow, Record const& rec)
+void MainWidget::fillRow(Gtk::TreeModel::iterator itRow, FileRecord const& rec)
 {
 	(*itRow)[byDirColumns.fileId] = rec.first;
 	(*itRow)[byDirColumns.filename] = 
-			fs::path(rec.second.header.fileName).filename().string();
+			fs::path(rec.second.fileName).filename().string();
 
 	Gtk::TreeModel::Path path = pTreeModel_->get_path(itRow);
 
@@ -211,22 +209,21 @@ try
 		ddb_playlist_t* const plt_;
 	} lockPlaylist(plt);
 	
-	RecordData const rec = db_.get((*itRow)[byDirColumns.fileId]);
-	std::string const& fileName = rec.header.fileName;
+	FileInfo const rec = db_.getFile((*itRow)[byDirColumns.fileId]);
 	
-	if (rec.header.isDir)
+	if (rec.isDir)
 	{
-		if (deadbeef->plt_add_dir2 (0, plt, fileName.c_str(), NULL, NULL) < 0)
+		if (deadbeef->plt_add_dir2 (0, plt, rec.fileName.c_str(), NULL, NULL) < 0)
 		{
-			std::cerr << "Failed to add folder '" << fileName
+			std::cerr << "Failed to add folder '" << rec.fileName
 					<< "' to playlist" << std::endl;
 		}
 	}
-	else if (fs::is_regular(fileName.c_str()))
+	else if (fs::is_regular(rec.fileName.c_str()))
 	{
-		if (deadbeef->plt_add_file2 (0, plt, fileName.c_str(), NULL, NULL) < 0)
+		if (deadbeef->plt_add_file2 (0, plt, rec.fileName.c_str(), NULL, NULL) < 0)
         {
-			std::cerr << "Failed to add file '" << fileName
+			std::cerr << "Failed to add file '" << rec.fileName
 					<< "' to playlist" << std::endl;
 		}
 	}
@@ -250,14 +247,14 @@ try
     pSelection->selected_foreach_iter(
         [this, &uris](const Gtk::TreeModel::iterator& itRow)
         {
-            RecordData const rec = db_.get((*itRow)[byDirColumns.fileId]);
+            FileInfo const rec = db_.getFile((*itRow)[byDirColumns.fileId]);
 
             if (uris.empty())
             {
                 uris += ' ';
             }
             
-            uris += Glib::filename_to_uri(rec.header.fileName);
+            uris += Glib::filename_to_uri(rec.fileName);
         });
         
     selection_data.set(selection_data.get_target(), uris);
@@ -325,9 +322,9 @@ void MainWidget::onPreDeleteRow(Gtk::TreeModel::Row const& row)
 void MainWidget::addRec(const RecordID& id)
 try
 {
-	RecordData recData = db_.get(id);
+	FileInfo recData = db_.getFile(id);
 	FileToRowMap::iterator const itParentRecord = 
-			file2row_.find(recData.header.parentID);
+			file2row_.find(recData.parentID);
 			
 	if (itParentRecord == file2row_.end())
 	{

@@ -18,7 +18,7 @@ class MainWidget : public Gtk::EventBox
 {
 public:
     MainWidget(
-            Database & db, 
+            DbReader&& db, 
             ScanEventSource scanEventSource,
             fs::path const& configDir);
 	virtual ~MainWidget() override;
@@ -43,7 +43,7 @@ private:
 	// auxiliary functions
 	void fillData(const RecordID& from, const Gtk::TreeModel::Children& to);
     void setupTreeView();
-	void fillRow(Gtk::TreeModel::iterator itRow, Record const& rec);
+	void fillRow(Gtk::TreeModel::iterator itRow, FileRecord const& rec);
 	void delRec(const RecordID& id);
 	void addRec(const RecordID& id);
 	void onPreDeleteRow(Gtk::TreeModel::Row const& row);
@@ -55,7 +55,7 @@ private:
 		Gtk::TreeModel::RowReference, 
 		boost::hash<RecordID>> FileToRowMap;
 	
-	Database &						db_;
+	DbReader						db_;
     ScanEventSource                 scanEventSource_;
     Gtk::VBox						sidebar_;
 	Gtk::HBox						firstRow_;

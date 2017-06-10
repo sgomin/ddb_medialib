@@ -4,48 +4,78 @@
 #include "db_record.hpp"
 #include "db_iterator.hpp"
 
-#include <vector>
+#include <boost/noncopyable.hpp>
 
-#include <db_cxx.h>
+#include <string>
+#include <memory>
+#include <stdexcept>
+#include <unordered_map>
+
+struct sqlite3;
+struct sqlite3_stmt;
 
 
-typedef std::vector<Record> Records;
-
-class Database
+class StatementCache
 {
 public:
-    Database();
+    explicit StatementCache(sqlite3* pDb);
+    ~StatementCache();
     
-    /// Opens database at given directory, creates if doesn't exist 
-    void        open(const std::string& path);
-	void		close();
-    
-    RecordData  get(const RecordID& id) const;
-    RecordID    add(const RecordData& record);
-    void        del(const RecordID& id);
-    void        replace(const RecordID& id, const RecordData& record);
-    Records     children(const RecordID& idParent) const;
-//    Record      find(const std::string& fileName) const;
-    
-    db_iterator dirs_begin() const;
-    db_iterator dirs_end() const;
+    sqlite3_stmt* get(int id, const char* szSQL);
+    void clear();
+    void setDb(sqlite3* pDb);
     
 private:
-//    static int getFileName(
-//        Db* sdbp, const Dbt* pkey, const Dbt* pdata, Dbt* skey);
-    static int getParentId(
-        Db* sdbp, const Dbt* pkey, const Dbt* pdata, Dbt* skey);
-    static int getDirId(
-        Db* sdbp, const Dbt* pkey, const Dbt* pdata, Dbt* skey);
-    
-    static std::string convert(const RecordData& record);
+    sqlite3*                               pDb_;
+    std::unordered_map<int, sqlite3_stmt*> statements_;
+};
 
-private:
-    DbEnv       env_;
-	mutable Db	dbMain_;
-//    mutable Db  dbFilename_;
-    mutable Db  dbParentId_;
-    mutable Db  dbDirs_;
+
+class DbReader
+{
+public:
+    ~DbReader();
+    DbReader(DbReader const&) = delete;
+    DbReader(DbReader&& other);
+    
+    DbReader& operator=(DbReader const&) = delete;
+    
+    FileInfo    getFile(const RecordID& id) const;
+    db_file_iterator_range childrenFiles(const RecordID& id) const;
+    db_file_iterator_range dirs() const;
+    
+protected:
+    friend class DbOwner;
+    DbReader(sqlite3* pDb);
+    
+    void close();
+    
+    sqlite3*                pDb_;
+    mutable StatementCache  statements_;
+};
+
+
+class DbOwner : public DbReader, private boost::noncopyable
+{
+public:
+    explicit DbOwner(const std::string& fileName);
+    
+    RecordID    addFile(const FileInfo& record);
+    void        delFile(const RecordID& id);
+    void        replaceFile(const RecordID& id, const FileInfo& record);
+    
+    DbReader createReader();
+    
+private:    
+    const std::string fileName_;
+};
+
+using DbOwnerPtr = std::unique_ptr<DbOwner>;
+
+class DbException : public std::runtime_error
+{
+public:
+    explicit DbException(int err);
 };
 
 #endif	/* DATABASE_HPP */

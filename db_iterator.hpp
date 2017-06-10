@@ -4,35 +4,34 @@
 #include "db_record.hpp"
 
 #include <boost/iterator/iterator_facade.hpp>
+#include <boost/range/iterator_range.hpp>
 
-class Dbc;
+struct sqlite3_stmt;
 
-class db_iterator 
+class db_file_iterator 
     :  public boost::iterator_facade<
-        db_iterator
-      , Record const
-      , boost::forward_traversal_tag>
+        db_file_iterator
+      , FileRecord const
+      , boost::single_pass_traversal_tag>
 {
 public:
-    explicit db_iterator(Dbc* pCursor, Record&& record);
-    db_iterator(const db_iterator& orig);
-    db_iterator(db_iterator&& orig);
-    
-    ~db_iterator();
-    
-    db_iterator& operator=(const db_iterator& orig);
-    db_iterator& operator=(db_iterator&& orig);
+    explicit db_file_iterator(struct sqlite3_stmt* pCursor);
+    ~db_file_iterator();
     
 private:
     friend class boost::iterator_core_access;
 
     void increment();
-    bool equal(db_iterator const& other) const;
-    const Record& dereference() const;
+    bool equal(db_file_iterator const& other) const;
+    FileRecord const& dereference() const;
     
-    Dbc* pCursor_;
-    Record record_;
+    void readNextRecord();
+    
+    struct sqlite3_stmt* pCursor_;
+    FileRecord           rec_;
 };
+
+using db_file_iterator_range = boost::iterator_range<db_file_iterator>;
 
 #endif /* DB_ITERATOR_HPP */
 

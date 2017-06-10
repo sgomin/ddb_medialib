@@ -1,34 +1,42 @@
+CCFLAGS = -fPIC
 CXXFLAGS += -std=c++11 -fPIC $$(pkg-config --cflags gtkmm-3.0)
-LIBS += $$(pkg-config --libs gtkmm-3.0) -ldb_cxx -lboost_system -lboost_exception -lboost_thread -lboost_filesystem
+LIBS += $$(pkg-config --libs gtkmm-3.0) -lboost_system -lboost_exception -lboost_thread -lboost_filesystem
+
+SQLITE_FLAGS = -D_HAVE_SQLITE_CONFIG_H
 
 ifdef DEBUG
     CXXFLAGS += -DDEBUG -ggdb3 -Wall
+    CCFLAGS += -DDEBUG -ggdb3 -Wall
 else
     CXXFLAGS += -DNDEBUG -O3
+    CCFLAGS += -DNDEBUG -O3
 endif
 
-ddb_misc_medialib.so: db_record.o database.o db_iterator.o main_widget.o medialib.o plugin.o scan_thread.o settings_dlg.o settings.o
-	$(CXX) -o ddb_misc_medialib.so -shared db_record.o database.o db_iterator.o main_widget.o medialib.o plugin.o scan_thread.o settings_dlg.o settings.o $(LIBS)
+ddb_misc_medialib.so: sqlite3.o db_record.o database.o db_iterator.o main_widget.o medialib.o plugin.o scan_thread.o settings_dlg.o settings.o
+	$(CXX) -o ddb_misc_medialib.so -shared db_record.o database.o db_iterator.o main_widget.o medialib.o plugin.o scan_thread.o settings_dlg.o settings.o sqlite3.o $(LIBS)
+
+sqlite3.o: sqlite3/sqlite3.c sqlite3/sqlite3.h sqlite3/config.h
+	$(CC) $(CCFLAGS) $(SQLITE_FLAGS) -c sqlite3/sqlite3.c
 
 db_record.o: db_record.cpp db_record.hpp
-	$(CXX) $(CXXFLAGS) -Wno-deprecated -c db_record.cpp
+	$(CXX) $(CXXFLAGS) -c db_record.cpp
 
 database.o: database.cpp database.hpp db_iterator.hpp db_record.hpp
-	$(CXX) $(CXXFLAGS) -Wno-deprecated -c database.cpp
+	$(CXX) $(CXXFLAGS) -c database.cpp
 	
 db_iterator.o: db_iterator.cpp db_iterator.hpp db_record.hpp
 	$(CXX) $(CXXFLAGS) -c db_iterator.cpp
 
-main_widget.o: main_widget.cpp main_widget.hpp
+main_widget.o: main_widget.cpp main_widget.hpp database.hpp db_iterator.hpp db_record.hpp
 	$(CXX) $(CXXFLAGS) -c main_widget.cpp
 
-medialib.o: medialib.cpp medialib.h
+medialib.o: medialib.cpp medialib.h plugin.hpp
 	$(CXX) $(CXXFLAGS) -c medialib.cpp
 
-plugin.o: plugin.cpp plugin.hpp
+plugin.o: plugin.cpp plugin.hpp scan_thread.hpp database.hpp db_iterator.hpp db_record.hpp
 	$(CXX) $(CXXFLAGS) -c plugin.cpp
 
-scan_thread.o: scan_thread.cpp scan_thread.hpp db_iterator.hpp db_record.hpp
+scan_thread.o: scan_thread.cpp scan_thread.hpp database.hpp db_iterator.hpp db_record.hpp
 	$(CXX) $(CXXFLAGS) -c scan_thread.cpp
 
 settings_dlg.o: settings_dlg.cpp settings_dlg.hpp

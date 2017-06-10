@@ -1,118 +1,73 @@
 #include "db_iterator.hpp"
+#include "database.hpp"
 
-
-#include <db_cxx.h>
+#include "sqlite3/sqlite3.h"
 #include <assert.h>
 
-db_iterator::db_iterator(Dbc* pCursor, Record&& record)
+
+db_file_iterator::db_file_iterator(struct sqlite3_stmt* pCursor)
     : pCursor_(pCursor)
-    , record_(std::move(record))
 {
+    readNextRecord();
 }
 
 
-db_iterator::db_iterator(const db_iterator& orig)
-    : pCursor_(nullptr)
-    , record_(orig.record_)
+db_file_iterator::~db_file_iterator()
 {
-    if (orig.pCursor_)
-    {
-        orig.pCursor_->dup(&pCursor_, DB_POSITION);
-    }
-}
-
-
-db_iterator::db_iterator(db_iterator&& orig)
-    : pCursor_(orig.pCursor_)
-    , record_(std::move(orig.record_))
-{
-    orig.pCursor_ = nullptr;
-}
-
-
-db_iterator::~db_iterator() 
-{
-    if (pCursor_)
-    {
-        pCursor_->close();
-    }
-}
-
-
-db_iterator& db_iterator::operator=(const db_iterator& orig)
-{
-    if(pCursor_)
-    {
-        pCursor_->close();
-        pCursor_ = nullptr;
-    }
     
-    if (orig.pCursor_)
-    {
-        orig.pCursor_->dup(&pCursor_, DB_POSITION);
-    }
-    
-    record_ = orig.record_;
-    return *this;
-}
-    
-
-db_iterator& db_iterator::operator=(db_iterator&& orig)
-{
-    if(pCursor_)
-    {
-        pCursor_->close();
-        pCursor_ = nullptr;
-    }
-    
-    std::swap(pCursor_, orig.pCursor_);
-    record_ = std::move(orig.record_);
-    return *this;
 }
 
 
-void db_iterator::increment()
+void db_file_iterator::increment()
 {
     assert(pCursor_);
-    
-    if (pCursor_)
-    {
-        RecordID id;
-        
-        Dbt key;
-        Dbt data;
-        key.set_flags(DB_DBT_USERMEM);
-        key.set_data(id.data());
-        key.set_ulen(id.size());
-
-        int err = pCursor_->get(&key, &data, DB_NEXT_NODUP);
-        
-        if (err == DB_NOTFOUND) // reached end
-        {
-            pCursor_->close();
-            pCursor_ = nullptr;
-            record_ = make_Record(NULL_RECORD_ID, RecordData());
-        }
-        else if (err)
-        {
-            throw DbException("Failed to advanse cursor", err);
-        }
-        else
-        {
-            record_ = make_Record(std::move(id), RecordData(data));
-        }
-    }
+    readNextRecord();
 }
    
 
-bool db_iterator::equal(db_iterator const& other) const
+bool db_file_iterator::equal(db_file_iterator const& other) const
 {
-    return record_.first == other.record_.first;
+    return pCursor_ == other.pCursor_;
 }
 
 
-const Record& db_iterator::dereference() const 
+FileRecord const& db_file_iterator::dereference() const 
 { 
     assert(pCursor_);
-    return record_; 
+    return rec_;   
+}
+
+
+void db_file_iterator::readNextRecord()
+{
+    if (!pCursor_)
+    {
+        return;
+    }
+    
+    auto res = sqlite3_step(pCursor_);
+    
+    if (res == SQLITE_DONE)
+    {
+        pCursor_ = nullptr;
+    }
+    else if (res != SQLITE_ROW)
+    {
+        throw DbException(res);
+    }
+    
+    rec_.first = sqlite3_column_int64(pCursor_, 0);
+    rec_.second.parentID = sqlite3_column_int64(pCursor_, 1);
+    rec_.second.lastWriteTime = sqlite3_column_int64(pCursor_, 2);
+    rec_.second.isDir = sqlite3_column_int(pCursor_, 3) != 0;
+    auto const * pFileName = sqlite3_column_text(pCursor_, 4);
+    
+    if (pFileName)
+    {
+        rec_.second.fileName = reinterpret_cast<const char*>(pFileName);
+    }
+    else
+    {
+        rec_.second.fileName.clear();
+    }
 }

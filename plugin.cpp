@@ -17,7 +17,7 @@ namespace fs = boost::filesystem;
 #include <memory.h>
 
 const std::string	CONFIG_FILENAME = "medialib";
-const std::string	DB_DIR = "medialibdb";
+const std::string	DB_FILENAME = "medialib.db";
 
 
 class Plugin::Impl
@@ -43,7 +43,7 @@ private:
     static ddb_gtkui_t              *   pGtkUi_;
     const fs::path                      fnSettings_;
 	static SettingsProvider             settings_;
-	static Database						db_;
+	static DbOwnerPtr					db_;
 	static ScanThreadPtr				pScanThread_;
     static MainWidget               *   pMainWidget_;
 };
@@ -51,7 +51,7 @@ private:
 ScanEventQueue                  Plugin::Impl::eventQueue_;
 ddb_gtkui_t *					Plugin::Impl::pGtkUi_ = nullptr;
 SettingsProvider				Plugin::Impl::settings_;
-Database						Plugin::Impl::db_;
+DbOwnerPtr						Plugin::Impl::db_;
 Plugin::Impl::ScanThreadPtr		Plugin::Impl::pScanThread_;
 MainWidget *                    Plugin::Impl::pMainWidget_ = nullptr;
 std::unique_ptr<Plugin::Impl>	Plugin::s_pImpl;
@@ -158,9 +158,9 @@ Extensions getSupportedExtensions()
 int Plugin::Impl::connect()
 try
 {
-	const fs::path pathDb = fs::path(deadbeef->get_config_dir()) / DB_DIR;
+	const fs::path pathDb = fs::path(deadbeef->get_config_dir()) / DB_FILENAME;
 	std::clog << "[" PLUGIN_NAME " ] Opening database at " << pathDb << std::endl;
-	db_.open(pathDb.string());
+	db_.reset(new DbOwner(pathDb.string()));
 	
     pGtkUi_ = (ddb_gtkui_t *) deadbeef->plug_get_for_id(DDB_GTKUI_PLUGIN_ID);
     
@@ -211,7 +211,7 @@ try
 	std::clog << "Stopping scanning thread" << std::endl;
 	pScanThread_.reset();
 	std::clog << "[" PLUGIN_NAME " ] Closing database " << std::endl;
-	db_.close();
+	db_.reset();
     pMainWidget_->onDisconnect();
 	return 0;
 }
@@ -236,13 +236,14 @@ try
     ddb_gtkui_widget_t *w = 
             static_cast<ddb_gtkui_widget_t*>(malloc(sizeof(ddb_gtkui_widget_t)));
     memset(w, 0, sizeof (*w));
-    pMainWidget_ = new MainWidget(db_, eventQueue_, deadbeef->get_config_dir());
+    pMainWidget_ = new MainWidget(
+            db_->createReader(), eventQueue_, deadbeef->get_config_dir());
 	
 	std::clog << "[" PLUGIN_NAME " ] Starting scan thread " << std::endl;
 	pScanThread_.reset(new ScanThread(
 						settings_, 
 						getSupportedExtensions(), 
-						db_,
+						std::move(db_),
 						eventQueue_,
                         pMainWidget_->getOnChangedDisp()));
 	
