@@ -4,10 +4,6 @@
 
 #include <iostream>
 
-namespace 
-{
-    
-}
 
 #define CHECK_SQLITE(expr) \
     { auto res = expr; if (res != SQLITE_OK) throw DbException(res); }
