@@ -40,8 +40,8 @@ public:
     
     DbReader& operator=(DbReader const&) = delete;
     
-    FileInfo    getFile(const RecordID& id) const;
-    db_file_iterator_range childrenFiles(const RecordID& id) const;
+    FileInfo    getFile(RecordID id) const;
+    db_file_iterator_range childrenFiles(RecordID id) const;
     db_file_iterator_range dirs() const;
     
 protected:
@@ -61,8 +61,8 @@ public:
     explicit DbOwner(const std::string& fileName);
     
     RecordID    addFile(const FileInfo& record);
-    void        delFile(const RecordID& id);
-    void        replaceFile(const RecordID& id, const FileInfo& record);
+    void        delFile(RecordID id);
+    void        replaceFile(RecordID id, const FileInfo& record);
     
     DbReader createReader();
     

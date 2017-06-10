@@ -72,7 +72,7 @@ RecordID DbOwner::addFile(const FileInfo& record)
 }
 
 
-void DbOwner::delFile(const RecordID& id)
+void DbOwner::delFile(RecordID id)
 {
     constexpr const char * const szSQL =
        "DELETE FROM files WHERE id = :id";
@@ -89,7 +89,7 @@ void DbOwner::delFile(const RecordID& id)
 }
 
 
-void DbOwner::replaceFile(const RecordID& id, const FileInfo& record)
+void DbOwner::replaceFile(RecordID id, const FileInfo& record)
 {
     constexpr const char * const szSQL =
        "UPDATE files SET"
@@ -180,7 +180,7 @@ void DbReader::close()
 }
 
 
-FileInfo DbReader::getFile(const RecordID& id) const
+FileInfo DbReader::getFile(RecordID id) const
 {
     constexpr const char * const szSQL =
        "SELECT parent_id, write_time, is_dir, name"
@@ -217,7 +217,7 @@ FileInfo DbReader::getFile(const RecordID& id) const
 }
 
 
-db_file_iterator_range DbReader::childrenFiles(const RecordID& id) const
+db_file_iterator_range DbReader::childrenFiles(RecordID id) const
 {
     constexpr const char * const szSQL =
        "SELECT id, parent_id, write_time, is_dir, name"
