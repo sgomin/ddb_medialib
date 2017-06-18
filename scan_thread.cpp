@@ -79,8 +79,7 @@ void ScanThread::scanDir(
 		return;
 	}
 	
-    auto rangeOldRecords = db_->childrenFiles(dirId);
-	FileRecords oldRecords{ rangeOldRecords.begin(), rangeOldRecords.end() };
+    auto oldRecords = db_->childrenFiles(dirId);
     
 	std::sort(oldRecords.begin(), oldRecords.end(), CmpByPath());
 		
@@ -122,6 +121,8 @@ try
 	{
 		return;
 	}
+    
+    std::clog << "[Scan] scanEntry " << path << std::endl;
 	
 	const bool isDir = fs::is_directory(path);	
 	FileRecord newRecord = make_Record(
@@ -207,6 +208,8 @@ void ScanThread::checkDir(const FileRecord& recDir)
 try
 {
     const fs::path dirPath = recDir.second.fileName;
+    
+    std::clog << "[Scan] checkDir " << recDir.second.fileName << std::endl;
             
     if(fs::is_directory(dirPath))
     {              
@@ -219,6 +222,7 @@ try
             newData.lastWriteTime = lastWriteTime;
             replaceEntry(make_Record(recDir.first, std::move(newData)));
             
+            std::clog << recDir.second.fileName << " changed, scanning" << std::endl;
             scanDir(recDir.first, 
                     fs::directory_iterator(dirPath), 
                     fs::directory_iterator());
@@ -238,6 +242,7 @@ catch(const std::exception& ex)
 
 void ScanThread::delEntry(const RecordID& id)
 {
+    std::clog << "[Scan] delEntry " << id << std::endl;
     changed_ = true;
     changes_.deleted.push_back(id);
 }
@@ -245,6 +250,7 @@ void ScanThread::delEntry(const RecordID& id)
 
 void ScanThread::addEntry(FileInfo&& data)
 {
+    std::clog << "[Scan] addEntry " << data.fileName << std::endl;
     changed_ = true;
     changes_.added.push_back(std::move(data));
 }
@@ -252,6 +258,7 @@ void ScanThread::addEntry(FileInfo&& data)
 
 void ScanThread::replaceEntry(FileRecord&& record)
 {
+    std::clog << "[Scan] replaceEntry " << record.second.fileName << std::endl;
     changed_ = true;
     changes_.changed.push_back(std::move(record));
 }
@@ -267,6 +274,7 @@ try
         
 		if (restart_)
 		{ // initially scan directories specified in settings
+            std::clog << "[Scan] initial scan " << std::endl;
 			Settings::Directories dirs = settings_.getSettings().directories;
             restart_ = false;
 			           

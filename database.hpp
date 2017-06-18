@@ -2,9 +2,9 @@
 #define	DATABASE_HPP
 
 #include "db_record.hpp"
-#include "db_iterator.hpp"
 
 #include <boost/noncopyable.hpp>
+#include <boost/optional.hpp>
 
 #include <string>
 #include <memory>
@@ -41,14 +41,15 @@ public:
     DbReader& operator=(DbReader const&) = delete;
     
     FileInfo    getFile(RecordID id) const;
-    db_file_iterator_range childrenFiles(RecordID id) const;
-    db_file_iterator_range dirs() const;
+    FileRecords childrenFiles(RecordID id) const;
+    FileRecords dirs() const;
     
 protected:
     friend class DbOwner;
     DbReader(sqlite3* pDb);
     
     void close();
+    static boost::optional<FileRecord> readNextRecord(sqlite3_stmt* pStmt);
     
     sqlite3*                pDb_;
     mutable StatementCache  statements_;

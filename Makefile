@@ -12,31 +12,25 @@ else
     CCFLAGS += -DNDEBUG -O3
 endif
 
-ddb_misc_medialib.so: sqlite3.o db_record.o database.o db_iterator.o main_widget.o medialib.o plugin.o scan_thread.o settings_dlg.o settings.o
-	$(CXX) -o ddb_misc_medialib.so -shared db_record.o database.o db_iterator.o main_widget.o medialib.o plugin.o scan_thread.o settings_dlg.o settings.o sqlite3.o $(LIBS)
+ddb_misc_medialib.so: sqlite3.o database.o main_widget.o medialib.o plugin.o scan_thread.o settings_dlg.o settings.o
+	$(CXX) -o ddb_misc_medialib.so -shared database.o main_widget.o medialib.o plugin.o scan_thread.o settings_dlg.o settings.o sqlite3.o $(LIBS)
 
 sqlite3.o: sqlite3/sqlite3.c sqlite3/sqlite3.h sqlite3/config.h
 	$(CC) $(CCFLAGS) $(SQLITE_FLAGS) -c sqlite3/sqlite3.c
 
-db_record.o: db_record.cpp db_record.hpp
-	$(CXX) $(CXXFLAGS) -c db_record.cpp
-
-database.o: database.cpp database.hpp db_iterator.hpp db_record.hpp
+database.o: database.cpp database.hpp db_record.hpp
 	$(CXX) $(CXXFLAGS) -c database.cpp
 	
-db_iterator.o: db_iterator.cpp db_iterator.hpp db_record.hpp
-	$(CXX) $(CXXFLAGS) -c db_iterator.cpp
-
-main_widget.o: main_widget.cpp main_widget.hpp database.hpp db_iterator.hpp db_record.hpp
+main_widget.o: main_widget.cpp main_widget.hpp database.hpp db_record.hpp
 	$(CXX) $(CXXFLAGS) -c main_widget.cpp
 
 medialib.o: medialib.cpp medialib.h plugin.hpp
 	$(CXX) $(CXXFLAGS) -c medialib.cpp
 
-plugin.o: plugin.cpp plugin.hpp scan_thread.hpp database.hpp db_iterator.hpp db_record.hpp
+plugin.o: plugin.cpp plugin.hpp scan_thread.hpp database.hpp db_record.hpp
 	$(CXX) $(CXXFLAGS) -c plugin.cpp
 
-scan_thread.o: scan_thread.cpp scan_thread.hpp database.hpp db_iterator.hpp db_record.hpp
+scan_thread.o: scan_thread.cpp scan_thread.hpp database.hpp db_record.hpp
 	$(CXX) $(CXXFLAGS) -c scan_thread.cpp
 
 settings_dlg.o: settings_dlg.cpp settings_dlg.hpp

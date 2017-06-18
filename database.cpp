@@ -3,7 +3,7 @@
 #include "sqlite3/sqlite3.h"
 
 #include <iostream>
-
+#include <assert.h>
 
 #define CHECK_SQLITE(expr) \
     { auto res = expr; if (res != SQLITE_OK) throw DbException(res); }
@@ -213,7 +213,7 @@ FileInfo DbReader::getFile(RecordID id) const
 }
 
 
-db_file_iterator_range DbReader::childrenFiles(RecordID id) const
+FileRecords DbReader::childrenFiles(RecordID id) const
 {
     constexpr const char * const szSQL =
        "SELECT id, parent_id, write_time, is_dir, name"
@@ -223,12 +223,18 @@ db_file_iterator_range DbReader::childrenFiles(RecordID id) const
     
     CHECK_SQLITE(sqlite3_bind_int64(pStmt, 1, id));
     
-    return boost::make_iterator_range(
-            db_file_iterator(pStmt), db_file_iterator(nullptr));
+    FileRecords result;
+    
+    while (auto rec = readNextRecord(pStmt))
+    {
+        result.push_back(std::move(*rec));
+    }
+    
+    return result;
 }   
 
 
-db_file_iterator_range DbReader::dirs() const
+FileRecords DbReader::dirs() const
 {
     constexpr const char * const szSQL =
        "SELECT id, parent_id, write_time, is_dir, name"
@@ -236,10 +242,54 @@ db_file_iterator_range DbReader::dirs() const
     
     sqlite3_stmt * pStmt = statements_.get(__LINE__, szSQL);
     
-    return boost::make_iterator_range(
-            db_file_iterator(pStmt), db_file_iterator(nullptr));
+    FileRecords result;
+    
+    while (auto rec = readNextRecord(pStmt))
+    {
+        result.push_back(std::move(*rec));
+    }
+    
+    return result;
 }
 
+
+boost::optional<FileRecord> DbReader::readNextRecord(sqlite3_stmt* pStmt)
+{
+    assert(pStmt);
+    
+    auto const res = sqlite3_step(pStmt);
+    
+    if (res == SQLITE_DONE)
+    {
+        CHECK_SQLITE(sqlite3_reset(pStmt));
+        return boost::none;
+    }
+    else if (res != SQLITE_ROW)
+    {
+        throw DbException(res);
+    }
+    else
+    {
+        FileRecord rec;
+        
+        rec.first = sqlite3_column_int64(pStmt, 0);
+        rec.second.parentID = sqlite3_column_int64(pStmt, 1);
+        rec.second.lastWriteTime = sqlite3_column_int64(pStmt, 2);
+        rec.second.isDir = sqlite3_column_int(pStmt, 3) != 0;
+        auto const * pFileName = sqlite3_column_text(pStmt, 4);
+
+        if (pFileName)
+        {
+            rec.second.fileName = reinterpret_cast<const char*>(pFileName);
+        }
+        else
+        {
+            rec.second.fileName.clear();
+        }
+        
+        return rec;
+    }
+}
 
 // --- StatementCache ----------------------------------------------------------
 
