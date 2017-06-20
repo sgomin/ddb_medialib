@@ -23,12 +23,14 @@ DbOwner::DbOwner(const std::string& fileName)
     }
     
     const char * const szSQL =
+    "PRAGMA foreign_keys = ON;"
     "CREATE TABLE IF NOT EXISTS files("
         "id INTEGER PRIMARY KEY ASC,"
-        "parent_id INTEGER REFERENCES files(id) ON DELETE CASCADE,"
+        "parent_id INTEGER,"
         "write_time DATETIME,"
         "is_dir BOOLEAN,"
-        "name TEXT"
+        "name TEXT,"
+        "FOREIGN KEY(parent_id) REFERENCES files(id) ON DELETE CASCADE"
         ");";
     
     res = sqlite3_exec(pDb_, szSQL, nullptr, nullptr, nullptr);
@@ -51,7 +53,15 @@ RecordID DbOwner::addFile(const FileInfo& record)
     
     sqlite3_stmt * pStmt = statements_.get(__LINE__, szSQL);
     
-    CHECK_SQLITE(sqlite3_bind_int64(pStmt, 1, record.parentID));
+    if (record.parentID != NULL_RECORD_ID)
+    {
+        CHECK_SQLITE(sqlite3_bind_int64(pStmt, 1, record.parentID));
+    }
+    else
+    {
+        CHECK_SQLITE(sqlite3_bind_null(pStmt, 1));
+    }
+    
     CHECK_SQLITE(sqlite3_bind_int64(pStmt, 2, record.lastWriteTime));
     CHECK_SQLITE(sqlite3_bind_int(pStmt, 3, record.isDir ? 1 : 0));
     CHECK_SQLITE(sqlite3_bind_text(pStmt, 4, 
@@ -97,7 +107,15 @@ void DbOwner::replaceFile(RecordID id, const FileInfo& record)
     
     sqlite3_stmt * pStmt = statements_.get(__LINE__, szSQL);
     
-    CHECK_SQLITE(sqlite3_bind_int64(pStmt, 1, record.parentID));
+    if (record.parentID != NULL_RECORD_ID)
+    {
+        CHECK_SQLITE(sqlite3_bind_int64(pStmt, 1, record.parentID));
+    }
+    else
+    {
+        CHECK_SQLITE(sqlite3_bind_null(pStmt, 1));
+    }
+    
     CHECK_SQLITE(sqlite3_bind_int64(pStmt, 2, record.lastWriteTime));
     CHECK_SQLITE(sqlite3_bind_int(pStmt, 3, record.isDir ? 1 : 0));
     CHECK_SQLITE(sqlite3_bind_text(pStmt, 4, 
