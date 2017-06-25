@@ -2,6 +2,7 @@
 #include "database.hpp"
 
 #include <boost/range.hpp>
+#include <boost/scope_exit.hpp>
 
 #include <thread>
 
@@ -279,7 +280,7 @@ try
         if (restart_)
 		{ // initially scan directories specified in settings
             std::clog << "[Scan] initial scan " << std::endl;
-			Settings::Directories dirs = settings_.getSettings().directories;
+			auto dirs = settings_.getSettings().directories;
             restart_ = false;
 			           
             try
@@ -377,6 +378,21 @@ bool ScanThread::save(Changes&& changes)
         return false;
     }
     
+    db_->beginTransaction();
+    bool succeed = false;
+    
+    BOOST_SCOPE_EXIT(&db_, &succeed)
+    {
+        if (succeed)
+        {
+            db_->commit();
+        }
+        else
+        {
+            db_->rollback();
+        }
+    } BOOST_SCOPE_EXIT_END
+    
     for (FileInfo& data : changes.added)
     {
         if (shouldBreak()) break;
@@ -401,6 +417,7 @@ bool ScanThread::save(Changes&& changes)
     	eventSink_.push(ScanEvent{ ScanEvent::DELETED, id });
     }
     
+    succeed = true;
     return true;
 }
 
