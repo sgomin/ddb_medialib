@@ -69,14 +69,16 @@ struct CmpByPath
 
 
 template<typename EntriesIt>
-void ScanThread::scanDir(
+ScanThread::Changes ScanThread::scanDir(
             const RecordID& dirId, 
             EntriesIt itEntriesBegin, 
             EntriesIt itEntriesEnd)
 {
+    Changes result;
+    
 	if (shouldBreak())
 	{
-		return;
+		return result;
 	}
 	
     auto oldRecords = db_->childrenFiles(dirId);
@@ -87,39 +89,34 @@ void ScanThread::scanDir(
 	
 	for (const auto& entry : entriesRange)
 	{
-		scanEntry(getPath(entry), dirId, oldRecords, isRecursive(entry));
+		result += scanEntry(getPath(entry), dirId, oldRecords, isRecursive(entry));
 		
 		if (shouldBreak())
 		{
-			return;
+			return result;
 		}
 	}
 	
 	for (const FileRecord& missing : oldRecords)
 	{
-		try
-		{
-            delEntry(missing.first);
-		}
-		catch(std::exception const& ex)
-		{
-			std::cerr << "Failed to delete DB record for '" 
-					<< missing.second.fileName << "' entry: " 
-					<< ex.what() << std::endl;
-		}
+		result.delEntry(missing.first);
 	}
+    
+    return result;
 }
 
-void ScanThread::scanEntry(
+ScanThread::Changes ScanThread::scanEntry(
 			const fs::path& path, 
 			const RecordID& parentID, 
 			FileRecords& oldRecords,
 			bool recursive)
 try
 {
+    Changes result;
+    
 	if (shouldBreak())
 	{
-		return;
+		return result;
 	}
     
     std::clog << "[Scan] scanEntry " << path << std::endl;
@@ -128,7 +125,7 @@ try
 	FileRecord newRecord = make_Record(
 		NULL_RECORD_ID, 
 		FileInfo{ parentID, /*last write time*/0, isDir, path.string() });
-
+    
 	const std::pair<FileRecords::iterator, FileRecords::iterator> oldRange = 
 		std::equal_range(oldRecords.begin(), oldRecords.end(), newRecord, CmpByPath());
 	assert(std::distance(oldRange.first, oldRange.second) <= 1);
@@ -141,27 +138,27 @@ try
 		// if new entry
 		if (itOldRecord == oldRecords.end())
 		{
-            addEntry(std::move(newRecord.second));
+            result.addEntry(std::move(newRecord.second));
 		}
 	}
 	else // file
 	{
 		if (!isSupportedExtension(path))
 		{
-			return; // unsupported extension
+			return result; // unsupported extension
 		}
 				
         newRecord.second.lastWriteTime = fs::last_write_time(path);
         
 		if (itOldRecord == oldRecords.end())
 		{
-            addEntry(std::move(newRecord.second));
+            result.addEntry(std::move(newRecord.second));
 		}
 		else if(newRecord.second.lastWriteTime != 
 				itOldRecord->second.lastWriteTime)
 		{
 			newRecord.first = itOldRecord->first;
-            replaceEntry(std::move(newRecord));
+            result.replaceEntry(std::move(newRecord));
 		}
 	}
 	
@@ -170,6 +167,8 @@ try
 	{
 		oldRecords.erase(itOldRecord);
 	}
+    
+    return result;
 }
 catch(const fs::filesystem_error& ex)
 {
@@ -191,11 +190,14 @@ catch(const fs::filesystem_error& ex)
 			oldRecords.erase(itOldRecord);
 		}
 	}
+    
+    return Changes();
 }
 catch(const std::exception& ex)
 {
 	std::cerr << "Failed to process filesystem element " 
 			<< path << ": " << ex.what() << std::endl;
+    return Changes();
 }
 
 
@@ -204,10 +206,11 @@ bool ScanThread::isSupportedExtension(const fs::path& fileName)
 	return extensions_.find(fileName.extension().string()) != extensions_.end();
 }
 
-void ScanThread::checkDir(const FileRecord& recDir)
+ScanThread::Changes ScanThread::checkDir(const FileRecord& recDir)
 try
 {
     const fs::path dirPath = recDir.second.fileName;
+    Changes result;
     
     std::clog << "[Scan] checkDir " << recDir.second.fileName << std::endl;
             
@@ -220,47 +223,53 @@ try
             FileInfo newData = recDir.second;
             
             newData.lastWriteTime = lastWriteTime;
-            replaceEntry(make_Record(recDir.first, std::move(newData)));
+            result.replaceEntry(make_Record(recDir.first, std::move(newData)));
             
             std::clog << recDir.second.fileName << " changed, scanning" << std::endl;
-            scanDir(recDir.first, 
+            result += scanDir(recDir.first, 
                     fs::directory_iterator(dirPath), 
                     fs::directory_iterator());
         }
     }
     else
     {
-        delEntry(recDir.first);
+        result.delEntry(recDir.first);
     }
+    
+    return result;
 }
 catch(const std::exception& ex)
 {
 	std::cerr << "Failed to check dir '" 
 			<< recDir.second.fileName << "': " << ex.what() << std::endl;
+    return Changes();
 }
 
 
-void ScanThread::delEntry(const RecordID& id)
+bool ScanThread::Changes::empty() const
+{
+    return deleted.empty() && changed.empty() && added.empty();
+}
+
+
+void ScanThread::Changes::delEntry(const RecordID& id)
 {
     std::clog << "[Scan] delEntry " << id << std::endl;
-    changed_ = true;
-    changes_.deleted.push_back(id);
+    deleted.push_back(id);
 }
 
 
-void ScanThread::addEntry(FileInfo&& data)
+void ScanThread::Changes::addEntry(FileInfo&& data)
 {
     std::clog << "[Scan] addEntry " << data.fileName << std::endl;
-    changed_ = true;
-    changes_.added.push_back(std::move(data));
+    added.push_back(std::move(data));
 }
 
 
-void ScanThread::replaceEntry(FileRecord&& record)
+void ScanThread::Changes::replaceEntry(FileRecord&& record)
 {
     std::clog << "[Scan] replaceEntry " << record.second.fileName << std::endl;
-    changed_ = true;
-    changes_.changed.push_back(std::move(record));
+    changed.push_back(std::move(record));
 }
 
 void ScanThread::operator() ()
@@ -270,9 +279,7 @@ try
 	
 	while (!stop_)
 	{
-        changed_ = false;
-        
-		if (restart_)
+        if (restart_)
 		{ // initially scan directories specified in settings
             std::clog << "[Scan] initial scan " << std::endl;
 			Settings::Directories dirs = settings_.getSettings().directories;
@@ -280,8 +287,8 @@ try
 			           
             try
             {
-                scanDir(ROOT_RECORD_ID, dirs.cbegin(), dirs.cend());
-                saveChangesToDB();
+                auto changes = scanDir(ROOT_RECORD_ID, dirs.cbegin(), dirs.cend());
+                save(std::move(changes));
             }
             catch(std::exception const& ex)
             {
@@ -290,10 +297,9 @@ try
             }
 		}
 		
-        scanDirs();
-        saveChangesToDB();
+        auto changed = save(scanDirs());
         
-		if (!changed_ && !stop_)
+		if (!changed && !stop_)
 		{
 			struct FackeLock 
 			{
@@ -310,7 +316,7 @@ try
 		}
 		else
 		{
-			sleepTime_ = std::chrono::seconds(2);
+			sleepTime_ = std::chrono::seconds(1);
 			std::this_thread::yield();
 		}
 	}
@@ -334,8 +340,10 @@ bool ScanThread::shouldBreak() const
 }
 
 
-void ScanThread::scanDirs()
+ScanThread::Changes ScanThread::scanDirs()
 {
+    Changes changes;
+    
     for (auto dir : db_->dirs())
     {
         if (shouldBreak())
@@ -343,14 +351,18 @@ void ScanThread::scanDirs()
             break;
         }
         
-        checkDir(dir);
+        changes += checkDir(dir);
     }
+    
+    return changes;
 }
 
 
-void ScanThread::saveChangesToDB()
+bool ScanThread::save(Changes&& changes)
 {
-    for (FileInfo& data : changes_.added)
+    bool changed = !changes.empty();
+    
+    for (FileInfo& data : changes.added)
     {
         if (shouldBreak()) break;
         
@@ -358,7 +370,7 @@ void ScanThread::saveChangesToDB()
         eventSink_.push(ScanEvent{ ScanEvent::ADDED, std::move(id) });
     }
     
-    for (FileRecord& record : changes_.changed)
+    for (FileRecord& record : changes.changed)
     {
         if (shouldBreak()) break;
         
@@ -366,7 +378,7 @@ void ScanThread::saveChangesToDB()
         eventSink_.push(ScanEvent{ ScanEvent::UPDATED, std::move(record.first) });
     }
     
-    for (RecordID& id : changes_.deleted)
+    for (RecordID id : changes.deleted)
     {
         if (shouldBreak()) break;
         
@@ -374,20 +386,19 @@ void ScanThread::saveChangesToDB()
     	eventSink_.push(ScanEvent{ ScanEvent::DELETED, std::move(id) });
     }
     
-    if (shouldBreak()) return;
-    
-    changes_.clear();
-    
     if (!eventSink_.empty())
     {
         onChangedDisp_();
     }
+    
+    return changed;
 }
 
-
-void ScanThread::Changes::clear()
+ScanThread::Changes& ScanThread::Changes::operator+= (Changes&& other)
 {
-    deleted.clear();
-    changed.clear();
-    added.clear();
+    deleted.splice(deleted.end(), std::move(other.deleted));
+    changed.splice(changed.end(), std::move(other.changed));
+    added.splice(added.end(), std::move(other.added));
+    
+    return *this;
 }

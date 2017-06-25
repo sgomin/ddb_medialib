@@ -42,29 +42,40 @@ public:
     void operator() ();
 
 private:
+    struct Changes
+    {
+        bool empty() const;
+        
+        void addEntry(FileInfo&& data);
+        void delEntry(const RecordID& id);
+        void replaceEntry(FileRecord&& record);
+    
+        Changes& operator+= (Changes&& other);
+        
+        std::list<RecordID>   deleted;
+        std::list<FileRecord> changed;
+        std::list<FileInfo>   added;
+    };
+    
     template<typename EntriesIt>
-    void scanDir(
+    Changes scanDir(
             const RecordID& dirId, 
             EntriesIt itEntriesBegin, 
             EntriesIt itEntriesEnd);
     
-    void scanEntry(
+    Changes scanEntry(
             const fs::path& path, 
             const RecordID& parentID, 
             FileRecords& oldRecords,
             bool recursive);
     
-    void checkDir(const FileRecord& recDir);
+    Changes checkDir(const FileRecord& recDir);
     
-    void addEntry(FileInfo&& data);
-    void delEntry(const RecordID& id);
-    void replaceEntry(FileRecord&& record);
-        
-	bool shouldBreak() const;
+    bool shouldBreak() const;
 	bool isSupportedExtension(const fs::path& fileName);
     
-    void scanDirs();
-    void saveChangesToDB();
+    Changes scanDirs();
+    bool save(Changes&& changes);
     
 	std::thread					thread_;
 	std::condition_variable_any	cond_;
@@ -75,17 +86,7 @@ private:
     DbOwnerPtr                  db_;
 	ScanEventSink				eventSink_;
     Glib::Dispatcher&           onChangedDisp_;
-	bool                        changed_ = false;
 	std::chrono::milliseconds	sleepTime_ = std::chrono::seconds(5);
-    
-    struct Changes
-    {
-        void clear();
-        
-        std::vector<RecordID>   deleted;
-        std::vector<FileRecord> changed;
-        std::vector<FileInfo>   added;
-    } changes_;
 };
 
 #endif	/* SCAN_THREAD_HPP */
