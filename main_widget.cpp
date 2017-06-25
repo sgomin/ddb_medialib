@@ -286,14 +286,17 @@ void MainWidget::onChanged()
 		switch(e.type)
 		{
 		case ScanEvent::ADDED:
+            std::clog << "[Widget] onAdded " << e.id << std::endl;
 			addRec(e.id);
 			break;
 			
 		case ScanEvent::DELETED:
+            std::clog << "[Widget] onDeleted " << e.id << std::endl;
 			delRec(e.id);
 			break;
 			
 		case ScanEvent::UPDATED:
+            std::clog << "[Widget] onUpdated " << e.id << std::endl;
 			break;
 		}
 	}
