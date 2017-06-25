@@ -68,11 +68,10 @@ struct CmpByPath
 }
 
 
-template<typename EntriesIt>
+template<typename EntriesRange>
 ScanThread::Changes ScanThread::scanDir(
             const RecordID& dirId, 
-            EntriesIt itEntriesBegin, 
-            EntriesIt itEntriesEnd)
+            EntriesRange const& entries)
 {
     Changes result;
     
@@ -85,9 +84,7 @@ ScanThread::Changes ScanThread::scanDir(
     
 	std::sort(oldRecords.begin(), oldRecords.end(), CmpByPath());
 		
-	auto entriesRange = boost::make_iterator_range(itEntriesBegin, itEntriesEnd);
-	
-	for (const auto& entry : entriesRange)
+	for (const auto& entry : entries)
 	{
 		result += scanEntry(getPath(entry), dirId, oldRecords, isRecursive(entry));
 		
@@ -227,8 +224,8 @@ try
             
             std::clog << recDir.second.fileName << " changed, scanning" << std::endl;
             result += scanDir(recDir.first, 
-                    fs::directory_iterator(dirPath), 
-                    fs::directory_iterator());
+                    boost::make_iterator_range(
+                        fs::directory_iterator(dirPath), fs::directory_iterator()));
         }
     }
     else
@@ -287,7 +284,7 @@ try
 			           
             try
             {
-                auto changes = scanDir(ROOT_RECORD_ID, dirs.cbegin(), dirs.cend());
+                auto changes = scanDir(ROOT_RECORD_ID, dirs);
                 save(std::move(changes));
             }
             catch(std::exception const& ex)

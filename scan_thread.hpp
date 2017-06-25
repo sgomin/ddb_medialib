@@ -57,11 +57,10 @@ private:
         std::list<FileInfo>   added;
     };
     
-    template<typename EntriesIt>
+    template<typename EntriesRange>
     Changes scanDir(
             const RecordID& dirId, 
-            EntriesIt itEntriesBegin, 
-            EntriesIt itEntriesEnd);
+            EntriesRange const& entries);
     
     Changes scanEntry(
             const fs::path& path, 
