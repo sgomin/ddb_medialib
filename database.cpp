@@ -339,7 +339,7 @@ sqlite3_stmt* StatementCache::get(int id, const char* szSQL)
     }
     else
     {
-        assert(sqlite3_stmt_busy(pStmt) == 0);
+//        assert(sqlite3_stmt_busy(pStmt) == 0);
         CHECK_SQLITE(sqlite3_reset(pStmt));
     }
     
