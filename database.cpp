@@ -150,7 +150,7 @@ void DbOwner::commit()
     
     if (res != SQLITE_DONE)
     {
-        throw DbException(res);
+        std::cerr << "Failed to commit transaction";
     }
 }
 
