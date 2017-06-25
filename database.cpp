@@ -1,5 +1,6 @@
 #include "database.hpp"
 
+#include "sqlite3/sqlite_locked.h"
 #include "sqlite3/sqlite3.h"
 
 #include <iostream>
@@ -12,6 +13,8 @@ DbOwner::DbOwner(const std::string& fileName)
     : DbReader(nullptr)
     , fileName_(fileName)
 {
+    CHECK_SQLITE(sqlite3_enable_shared_cache(true));
+    
     auto res = sqlite3_open_v2(fileName.c_str(), &pDb_, 
             SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nullptr);
     
@@ -67,7 +70,7 @@ RecordID DbOwner::addFile(const FileInfo& record)
     CHECK_SQLITE(sqlite3_bind_text(pStmt, 4, 
        record.fileName.c_str(), record.fileName.length(), SQLITE_TRANSIENT));
     
-    auto res = sqlite3_step(pStmt);
+    auto res = sqlite3_blocking_step(pStmt);
     
     if (res != SQLITE_DONE)
     {
@@ -86,7 +89,7 @@ void DbOwner::delFile(RecordID id)
     sqlite3_stmt * pStmt = statements_.get(__LINE__, szSQL);
     
     CHECK_SQLITE(sqlite3_bind_int64(pStmt, 1, id));
-    auto res = sqlite3_step(pStmt);
+    auto res = sqlite3_blocking_step(pStmt);
     
     if (res != SQLITE_DONE)
     {
@@ -122,7 +125,7 @@ void DbOwner::replaceFile(RecordID id, const FileInfo& record)
        record.fileName.c_str(), record.fileName.length(), SQLITE_TRANSIENT));
     CHECK_SQLITE(sqlite3_bind_int64(pStmt, 5, id));
     
-    auto res = sqlite3_step(pStmt);
+    auto res = sqlite3_blocking_step(pStmt);
     
     if (res != SQLITE_DONE)
     {
@@ -134,7 +137,7 @@ void DbOwner::replaceFile(RecordID id, const FileInfo& record)
 void DbOwner::beginTransaction()
 {
     sqlite3_stmt * pStmt = statements_.get(__LINE__, "BEGIN TRANSACTION");
-    auto res = sqlite3_step(pStmt);
+    auto res = sqlite3_blocking_step(pStmt);
     
     if (res != SQLITE_DONE)
     {
@@ -146,7 +149,7 @@ void DbOwner::beginTransaction()
 void DbOwner::commit()
 {
     sqlite3_stmt * pStmt = statements_.get(__LINE__, "COMMIT TRANSACTION");
-    auto res = sqlite3_step(pStmt);
+    auto res = sqlite3_blocking_step(pStmt);
     
     if (res != SQLITE_DONE)
     {
@@ -158,7 +161,7 @@ void DbOwner::commit()
 void DbOwner::rollback()
 {
     sqlite3_stmt * pStmt = statements_.get(__LINE__, "ROLLBACK TRANSACTION");
-    auto res = sqlite3_step(pStmt);
+    auto res = sqlite3_blocking_step(pStmt);
     
     if (res != SQLITE_DONE)
     {
@@ -239,7 +242,7 @@ FileInfo DbReader::getFile(RecordID id) const
     sqlite3_stmt * pStmt = statements_.get(__LINE__, szSQL);
     
     CHECK_SQLITE(sqlite3_bind_int64(pStmt, 1, id));
-    auto res = sqlite3_step(pStmt);
+    auto res = sqlite3_blocking_step(pStmt);
     
     if (res == SQLITE_DONE)
     {
@@ -311,7 +314,7 @@ boost::optional<FileRecord> DbReader::readNextRecord(sqlite3_stmt* pStmt)
 {
     assert(pStmt);
     
-    auto const res = sqlite3_step(pStmt);
+    auto const res = sqlite3_blocking_step(pStmt);
     
     if (res == SQLITE_DONE)
     {
@@ -364,14 +367,14 @@ void StatementCache::setDb(sqlite3* pDb)
     pDb_ = pDb;
 }
 
-
+                
 sqlite3_stmt* StatementCache::get(int id, const char* szSQL)
 {
     auto& pStmt = statements_[id];
     
     if (!pStmt)
     {
-        CHECK_SQLITE(sqlite3_prepare_v2(pDb_, szSQL, -1, &pStmt, nullptr));
+        CHECK_SQLITE(sqlite3_blocking_prepare_v2(pDb_, szSQL, -1, &pStmt, nullptr));
     }
     else
     {

@@ -12,13 +12,16 @@ else
     CCFLAGS += -DNDEBUG -O3
 endif
 
-ddb_misc_medialib.so: sqlite3.o database.o main_widget.o medialib.o plugin.o scan_thread.o settings_dlg.o settings.o
-	$(CXX) -o ddb_misc_medialib.so -shared database.o main_widget.o medialib.o plugin.o scan_thread.o settings_dlg.o settings.o sqlite3.o $(LIBS)
+ddb_misc_medialib.so: sqlite3.o sqlite_locked.o database.o main_widget.o medialib.o plugin.o scan_thread.o settings_dlg.o settings.o
+	$(CXX) -o ddb_misc_medialib.so -shared database.o sqlite_locked.o main_widget.o medialib.o plugin.o scan_thread.o settings_dlg.o settings.o sqlite3.o $(LIBS)
 
 sqlite3.o: sqlite3/sqlite3.c sqlite3/sqlite3.h sqlite3/config.h
 	$(CC) $(CCFLAGS) $(SQLITE_FLAGS) -c sqlite3/sqlite3.c
 
-database.o: database.cpp database.hpp db_record.hpp
+sqlite_locked.o: sqlite3/sqlite_locked.cpp sqlite3/sqlite_locked.h sqlite3/sqlite3.h sqlite3/config.h
+	$(CXX) $(CXXFLAGS) -c sqlite3/sqlite_locked.cpp
+
+database.o: database.cpp database.hpp db_record.hpp sqlite3/sqlite_locked.h sqlite3/sqlite3.h sqlite3/config.h
 	$(CXX) $(CXXFLAGS) -c database.cpp
 	
 main_widget.o: main_widget.cpp main_widget.hpp database.hpp db_record.hpp
