@@ -304,18 +304,33 @@ try
 				void unlock() {}
 			} fackeLock;
 			
-			cond_.wait_for(fackeLock, sleepTime_);
+            constexpr int sleepMs = 500;
+            
+            for (int i = 0; i < sleepTimeMs_; i += sleepMs)
+            {
+                cond_.wait_for(fackeLock, std::chrono::milliseconds(sleepMs));
+                
+                if (!eventSink_.empty())
+                {
+                    onChangedDisp_(); // doesn't always gets dispatched, so need to push periodically
+                }
+            }
 			
-			if (sleepTime_ < std::chrono::seconds(5))
+			if (sleepTimeMs_ < 5000) // don't sleep more than 5 sec
 			{
-				sleepTime_ += std::chrono::seconds(1);
+				sleepTimeMs_ += sleepMs; // next time will wait longer
             }
 		}
 		else
 		{
-			sleepTime_ = std::chrono::seconds(1);
+			sleepTimeMs_ = 500;
 			std::this_thread::yield();
 		}
+        
+        if (!eventSink_.empty())
+        {
+            onChangedDisp_();
+        }
 	}
 	
 	std::clog << "Scanning thread stopped" << std::endl;
@@ -357,14 +372,17 @@ ScanThread::Changes ScanThread::scanDirs()
 
 bool ScanThread::save(Changes&& changes)
 {
-    bool changed = !changes.empty();
+    if (changes.empty())
+    {
+        return false;
+    }
     
     for (FileInfo& data : changes.added)
     {
         if (shouldBreak()) break;
         
         RecordID id = db_->addFile(std::move(data));
-        eventSink_.push(ScanEvent{ ScanEvent::ADDED, std::move(id) });
+        eventSink_.push(ScanEvent{ ScanEvent::ADDED, id });
     }
     
     for (FileRecord& record : changes.changed)
@@ -372,7 +390,7 @@ bool ScanThread::save(Changes&& changes)
         if (shouldBreak()) break;
         
         db_->replaceFile(record.first, std::move(record.second));
-        eventSink_.push(ScanEvent{ ScanEvent::UPDATED, std::move(record.first) });
+        eventSink_.push(ScanEvent{ ScanEvent::UPDATED, record.first });
     }
     
     for (RecordID id : changes.deleted)
@@ -380,15 +398,10 @@ bool ScanThread::save(Changes&& changes)
         if (shouldBreak()) break;
         
         db_->delFile(id);
-    	eventSink_.push(ScanEvent{ ScanEvent::DELETED, std::move(id) });
+    	eventSink_.push(ScanEvent{ ScanEvent::DELETED, id });
     }
     
-    if (!eventSink_.empty())
-    {
-        onChangedDisp_();
-    }
-    
-    return changed;
+    return true;
 }
 
 ScanThread::Changes& ScanThread::Changes::operator+= (Changes&& other)

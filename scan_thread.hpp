@@ -85,7 +85,7 @@ private:
     DbOwnerPtr                  db_;
 	ScanEventSink				eventSink_;
     Glib::Dispatcher&           onChangedDisp_;
-	std::chrono::milliseconds	sleepTime_ = std::chrono::seconds(5);
+	int                     	sleepTimeMs_ = 500;
 };
 
 #endif	/* SCAN_THREAD_HPP */
