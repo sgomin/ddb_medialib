@@ -65,6 +65,10 @@ public:
     void        delFile(RecordID id);
     void        replaceFile(RecordID id, const FileInfo& record);
     
+    void beginTransaction();
+    void commit();
+    void rollback();
+    
     DbReader createReader();
     
 private:    

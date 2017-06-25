@@ -130,6 +130,42 @@ void DbOwner::replaceFile(RecordID id, const FileInfo& record)
     }
 }
     
+
+void DbOwner::beginTransaction()
+{
+    sqlite3_stmt * pStmt = statements_.get(__LINE__, "BEGIN TRANSACTION");
+    auto res = sqlite3_step(pStmt);
+    
+    if (res != SQLITE_DONE)
+    {
+        throw DbException(res);
+    }
+}
+
+
+void DbOwner::commit()
+{
+    sqlite3_stmt * pStmt = statements_.get(__LINE__, "COMMIT TRANSACTION");
+    auto res = sqlite3_step(pStmt);
+    
+    if (res != SQLITE_DONE)
+    {
+        throw DbException(res);
+    }
+}
+
+    
+void DbOwner::rollback()
+{
+    sqlite3_stmt * pStmt = statements_.get(__LINE__, "ROLLBACK TRANSACTION");
+    auto res = sqlite3_step(pStmt);
+    
+    if (res != SQLITE_DONE)
+    {
+        std::cerr << "Failed to rollback transaction";
+    }
+}
+    
     
 DbReader DbOwner::createReader()
 {
