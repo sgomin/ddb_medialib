@@ -274,11 +274,20 @@ FileRecords DbReader::childrenFiles(RecordID id) const
 {
     constexpr const char * const szSQL =
        "SELECT id, parent_id, write_time, is_dir, name"
-       " FROM files WHERE parent_id = :parent_id";
+       " FROM files"
+       " WHERE parent_id = :parent_id"
+         " OR (parent_id IS NULL AND :parent_id IS NULL)";
     
     sqlite3_stmt * pStmt = statements_.get(__LINE__, szSQL);
     
-    CHECK_SQLITE(sqlite3_bind_int64(pStmt, 1, id));
+    if (id)
+    {
+        CHECK_SQLITE(sqlite3_bind_int64(pStmt, 1, id));
+    }
+    else
+    {
+        CHECK_SQLITE(sqlite3_bind_null(pStmt, 1));
+    }
     
     FileRecords result;
     
