@@ -311,6 +311,8 @@ try
             {
                 cond_.wait_for(fackeLock, std::chrono::milliseconds(sleepMs));
                 
+                if (shouldBreak()) break;
+                
                 if (!eventSink_.empty())
                 {
                     onChangedDisp_(); // doesn't always gets dispatched, so need to push periodically
