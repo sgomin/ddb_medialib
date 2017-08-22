@@ -2,6 +2,10 @@
 
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/json_parser.hpp>
+#include <boost/filesystem.hpp>
+namespace fs = boost::filesystem;
+
+#include <fstream>
 
 
 const std::string	CONFIG_DIRECTORIES_KEY = "directories";
@@ -26,6 +30,12 @@ void Settings::load(std::string const& fileName)
 {
     using boost::property_tree::ptree;
 	using namespace boost::property_tree::json_parser;
+    
+    if (!fs::exists(fileName))
+    {
+        save(fileName);
+        return;
+    }
     
     ptree tree;
 	read_json(fileName, tree);
