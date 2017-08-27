@@ -118,8 +118,7 @@ void Plugin::storeSettings(Settings settings)
 
 
 Plugin::Impl::Impl() 
- : app_(Gtk::Application::create())
- , fnSettings_(fs::path(deadbeef->get_config_dir()) / CONFIG_FILENAME)
+ : fnSettings_(fs::path(deadbeef->get_config_dir()) / CONFIG_FILENAME)
 {
 	Settings settings;
 	settings.load(fnSettings_.string());
@@ -177,6 +176,7 @@ try
             return -1;
         }
         
+        app_ = Gtk::Application::create();
         pGtkUi_->w_reg_widget(
             PLUGIN_NAME, DDB_WF_SINGLE_INSTANCE, &createWidget, "medialib", NULL);
     }
@@ -212,7 +212,12 @@ try
 	pScanThread_.reset();
 	std::clog << "[" PLUGIN_NAME " ] Closing database " << std::endl;
 	db_.reset();
-    pMainWidget_->onDisconnect();
+    
+    if (pMainWidget_)
+    {
+        pMainWidget_->onDisconnect();
+    }
+    
 	return 0;
 }
 catch(const DbException & ex)

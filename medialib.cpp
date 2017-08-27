@@ -12,7 +12,7 @@ static const char settings_dlg[] =
     "property \"Enable plugin\"                 checkbox "              CONFSTR_MEDIALIB_ENABLED              " 1 ;\n"
     "property \"Default path: \"                file "                 CONFSTR_MEDIALIB_ROOTPATH         " \" ~\\home\\Music \" ;\n";
 
-extern "C" DB_plugin_t * ddb_misc_medialib_load (DB_functions_t *ddb)
+extern "C" DB_plugin_t * ddb_misc_medialib_gtk3_load (DB_functions_t *ddb)
 {
     std::clog << "Loading " PLUGIN_NAME << std::endl;
     

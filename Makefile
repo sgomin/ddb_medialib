@@ -12,8 +12,8 @@ else
     CCFLAGS += -DNDEBUG -O3
 endif
 
-ddb_misc_medialib.so: sqlite3.o sqlite_locked.o database.o main_widget.o medialib.o plugin.o scan_thread.o settings_dlg.o settings.o
-	$(CXX) -o ddb_misc_medialib.so -shared database.o sqlite_locked.o main_widget.o medialib.o plugin.o scan_thread.o settings_dlg.o settings.o sqlite3.o $(LIBS)
+ddb_misc_medialib_gtk3.so: sqlite3.o sqlite_locked.o database.o main_widget.o medialib.o plugin.o scan_thread.o settings_dlg.o settings.o
+	$(CXX) -o ddb_misc_medialib_gtk3.so -shared database.o sqlite_locked.o main_widget.o medialib.o plugin.o scan_thread.o settings_dlg.o settings.o sqlite3.o $(LIBS)
 
 sqlite3.o: sqlite3/sqlite3.c sqlite3/sqlite3.h sqlite3/config.h
 	$(CC) $(CCFLAGS) $(SQLITE_FLAGS) -c sqlite3/sqlite3.c
@@ -44,13 +44,13 @@ settings.o: settings.cpp settings.hpp
 
 all: ddb_misc_medialib.so
 
-local_install: ddb_misc_medialib.so
+local_install: ddb_misc_medialib_gtk3.so
 	mkdir -p $$HOME/.local/lib/deadbeef
-	cp -f ddb_misc_medialib.so $$HOME/.local/lib/deadbeef
+	cp -f ddb_misc_medialib_gtk3.so $$HOME/.local/lib/deadbeef
 	
-install: ddb_misc_medialib.so
-	mkdir -p $(DESTDIR)/opt/deadbeef/lib/deadbeef
-	cp -f ddb_misc_medialib.so $(DESTDIR)/opt/deadbeef/lib/deadbeef
+install: ddb_misc_medialib_gtk3.so
+	mkdir -p $(DESTDIR)/usr/lib/deadbeef
+	cp -f ddb_misc_medialib_gtk3.so $(DESTDIR)/usr/lib/deadbeef
 
 clean:
 	$(RM) *.o
