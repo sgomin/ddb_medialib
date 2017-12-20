@@ -1,6 +1,15 @@
+GTKMM_VER=3.0
+PLUGIN_NAME=ddb_misc_medialib
+PLUGIN_FILENAME=$(PLUGIN_NAME)_gtk3.so
+
+ifdef GTK2
+    GTKMM_VER=2.4
+    PLUGIN_FILENAME=$(PLUGIN_NAME)_gtk2.so
+endif
+
 CCFLAGS = -fPIC
-CXXFLAGS += -std=c++11 -fPIC $$(pkg-config --cflags gtkmm-3.0)
-LIBS += $$(pkg-config --libs gtkmm-3.0) -lboost_system -lboost_exception -lboost_thread -lboost_filesystem
+CXXFLAGS += -std=c++11 -fPIC $$(pkg-config --cflags gtkmm-$(GTKMM_VER))
+LIBS += $$(pkg-config --libs gtkmm-$(GTKMM_VER)) -lboost_system -lboost_exception -lboost_thread -lboost_filesystem
 
 SQLITE_FLAGS = -D_HAVE_SQLITE_CONFIG_H
 
@@ -12,8 +21,13 @@ else
     CCFLAGS += -DNDEBUG -O3
 endif
 
-ddb_misc_medialib_gtk3.so: sqlite3.o sqlite_locked.o database.o main_widget.o medialib.o plugin.o scan_thread.o settings_dlg.o settings.o
-	$(CXX) -o ddb_misc_medialib_gtk3.so -shared database.o sqlite_locked.o main_widget.o medialib.o plugin.o scan_thread.o settings_dlg.o settings.o sqlite3.o $(LIBS)
+ifdef GTK2
+    CXXFLAGS += -DUSE_GTK2
+endif
+
+
+$(PLUGIN_FILENAME): sqlite3.o sqlite_locked.o database.o main_widget.o medialib.o plugin.o scan_thread.o settings_dlg.o settings.o
+	$(CXX) -o $(PLUGIN_FILENAME) -shared database.o sqlite_locked.o main_widget.o medialib.o plugin.o scan_thread.o settings_dlg.o settings.o sqlite3.o $(LIBS)
 
 sqlite3.o: sqlite3/sqlite3.c sqlite3/sqlite3.h sqlite3/config.h
 	$(CC) $(CCFLAGS) $(SQLITE_FLAGS) -c sqlite3/sqlite3.c
@@ -23,7 +37,7 @@ sqlite_locked.o: sqlite3/sqlite_locked.cpp sqlite3/sqlite_locked.h sqlite3/sqlit
 
 database.o: database.cpp database.hpp db_record.hpp sqlite3/sqlite_locked.h sqlite3/sqlite3.h sqlite3/config.h
 	$(CXX) $(CXXFLAGS) -c database.cpp
-	
+
 main_widget.o: main_widget.cpp main_widget.hpp database.hpp db_record.hpp
 	$(CXX) $(CXXFLAGS) -c main_widget.cpp
 
@@ -44,13 +58,13 @@ settings.o: settings.cpp settings.hpp
 
 all: ddb_misc_medialib.so
 
-local_install: ddb_misc_medialib_gtk3.so
+local_install: $(PLUGIN_FILENAME)
 	mkdir -p $$HOME/.local/lib/deadbeef
-	cp -f ddb_misc_medialib_gtk3.so $$HOME/.local/lib/deadbeef
-	
-install: ddb_misc_medialib_gtk3.so
+	cp -f $(PLUGIN_FILENAME) $$HOME/.local/lib/deadbeef
+
+install: $(PLUGIN_FILENAME)
 	mkdir -p $(DESTDIR)/usr/lib/deadbeef
-	cp -f ddb_misc_medialib_gtk3.so $(DESTDIR)/usr/lib/deadbeef
+	cp -f $(PLUGIN_FILENAME) $(DESTDIR)/usr/lib/deadbeef
 
 clean:
 	$(RM) *.o

@@ -37,8 +37,12 @@ private:
     static void destroyWidget(ddb_gtkui_widget_t *w);
     
 	typedef std::unique_ptr<ScanThread> ScanThreadPtr;
-	
+
+#ifdef USE_GTK2
+  std::unique_ptr<Gtk::Main>            app_;
+#else
     Glib::RefPtr<Gtk::Application>      app_;
+#endif
     static ScanEventQueue               eventQueue_;
     static ddb_gtkui_t              *   pGtkUi_;
     const fs::path                      fnSettings_;
@@ -175,8 +179,15 @@ try
                     << DDB_GTKUI_PLUGIN_ID << "' plugin!" <<std::endl;
             return -1;
         }
-        
-        app_ = Gtk::Application::create();
+#ifdef USE_GTK2
+	int argc = 0;
+	char args[] = "";
+	char* argv = args;
+	char** pargv = &argv;
+	app_.reset( new Gtk::Main(argc, pargv) );
+#else
+        app_ = Application::create();
+#endif
         pGtkUi_->w_reg_widget(
             PLUGIN_NAME, DDB_WF_SINGLE_INSTANCE, &createWidget, "medialib", NULL);
     }

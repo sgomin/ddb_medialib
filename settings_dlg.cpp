@@ -2,11 +2,23 @@
 
 #include <vector>
 
+
+struct DirListColumns : Gtk::TreeModel::ColumnRecord
+{
+    Gtk::TreeModelColumn<Glib::ustring> path;
+    DirListColumns() { add(path); }
+};
+
+static const DirListColumns dirListColumns; // TODO: make non-static
+
+
 SettingsDlg::SettingsDlg(Settings & settings) :
     Gtk::Dialog("Settings", /*modal*/ true),
     settings_(settings),
     btnDel_("Delete")
 {
+    initDirList();
+  
     for (auto dir : settings_.directories)
     {
         addDirectory(dir.first, dir.second);
@@ -20,25 +32,39 @@ SettingsDlg::SettingsDlg(Settings & settings) :
     
     pBtnAdd->signal_clicked().connect(sigc::mem_fun(*this, &SettingsDlg::onAddDir));
     btnDel_.signal_clicked().connect(sigc::mem_fun(*this, &SettingsDlg::onDelDir));
-    lbDirectories_.signal_row_selected().connect(
-        sigc::mem_fun(*this, &SettingsDlg::onSelChanged));
     
-    btnDel_.set_sensitive(false);
-    pFrame->add(lbDirectories_);
+    //    btnDel_.set_sensitive(false);
+    pFrame->add(dirList_);
     pRightBox->pack_end(btnDel_, Gtk::PACK_SHRINK);
     pRightBox->pack_end(*pBtnAdd, Gtk::PACK_SHRINK);
     
     pMainBox->pack_start(*pFrame, Gtk::PACK_EXPAND_WIDGET, 1);
     pMainBox->pack_start(*pRightBox, Gtk::PACK_SHRINK);
-    
+
+ #ifdef USE_GTK2
+    get_vbox()->pack_start(*pMainBox, Gtk::PACK_EXPAND_WIDGET, 1);
+ #else
     get_content_area()->set_orientation(Gtk::ORIENTATION_VERTICAL);
     get_content_area()->pack_start(*pMainBox, Gtk::PACK_EXPAND_WIDGET, 1);
+ #endif
     
     this->add_button(Gtk::Stock::OK, Gtk::RESPONSE_OK);
     this->add_button(Gtk::Stock::CANCEL, Gtk::RESPONSE_CANCEL);
     
     show_all();
 }
+
+
+void SettingsDlg::initDirList()
+{
+    pListModel_ = Gtk::ListStore::create(dirListColumns);
+    dirList_.set_model(pListModel_);
+    dirList_.append_column("Path", dirListColumns.path);
+    dirList_.set_headers_visible(false);
+    //    dirList_.signal_selection_notify_event().connect(
+    //        sigc::mem_fun(*this, &SettingsDlg::onSelNotify));
+}
+
 
 void SettingsDlg::onAddDir()
 {
@@ -71,29 +97,29 @@ void SettingsDlg::onAddDir()
     
 void SettingsDlg::onDelDir()
 {
-    Gtk::ListBoxRow*  pRow = lbDirectories_.get_selected_row();
+    auto selection = dirList_.get_selection();
+    auto itRow = selection->get_selected();
     
-    if (pRow)
+    if (itRow)
     {
-        std::string dir = static_cast<Gtk::Label*>(pRow->get_child())->get_text();
+        Glib::ustring dir = (*itRow)[ dirListColumns.path ];
         settings_.directories.erase(dir);
-        pRow->remove();
-        lbDirectories_.unselect_row();
+        pListModel_->erase(itRow);
+        selection->unselect_all();
+	//btnDel_.set_sensitive(false);
         show_all();
     }
-    
 }
-
-void SettingsDlg::onSelChanged(Gtk::ListBoxRow * pRow)
+/*
+bool SettingsDlg::onSelNotify(GdkEventSelection* selection_event)
 {
-    btnDel_.set_sensitive(pRow != nullptr);
+    btnDel_.set_sensitive(true);
 }
-
+*/
 void SettingsDlg::addDirectory(
 	const std::string & dirname, 
     const Settings::Directory & /*settings*/)
 {
-    Gtk::Label * pLabel = Gtk::manage(new Gtk::Label(dirname));
-    pLabel->set_alignment(Gtk::ALIGN_START, Gtk::ALIGN_CENTER);
-    lbDirectories_.append(*pLabel);
+    auto itNewRow = pListModel_->append();
+    (*itNewRow)[ dirListColumns.path ] = dirname;
 }
