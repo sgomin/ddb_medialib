@@ -1,7 +1,7 @@
 #ifndef MEDIALIB_H
 #define	MEDIALIB_H
 
-#include <deadbeef/deadbeef.h>
+#include "deadbeef/deadbeef.h"
 
 #define PLUGIN_NAME "Media Library"
 

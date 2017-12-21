@@ -7,7 +7,7 @@
 
 #include <sys/types.h>
 
-#include <deadbeef/gtkui_api.h>
+#include "deadbeef/gtkui_api.h"
 
 #include <boost/filesystem.hpp>
 namespace fs = boost::filesystem;
@@ -186,7 +186,7 @@ try
 	char** pargv = &argv;
 	app_.reset( new Gtk::Main(argc, pargv) );
 #else
-        app_ = Application::create();
+        app_ = Gtk::Application::create();
 #endif
         pGtkUi_->w_reg_widget(
             PLUGIN_NAME, DDB_WF_SINGLE_INSTANCE, &createWidget, "medialib", NULL);
