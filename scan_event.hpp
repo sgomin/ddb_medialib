@@ -4,7 +4,7 @@
 #include "database.hpp"
 
 #include <boost/thread/sync_queue.hpp>
-#include <boost/thread/concurrent_queues/queue_views.hpp>
+#include "queue_views.hpp"
 
 struct ScanEvent
 {
