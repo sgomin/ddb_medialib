@@ -22,7 +22,7 @@ MainWidget::MainWidget(
  : db_(std::move(db))
  , scanEventSource_(scanEventSource)
  , settingsBtn_("Settings")
- , expandRowsFileName_((configDir / "expanded_rorws").string())
+ , expandRowsFileName_((configDir / "expanded_rows").string())
 {
     styleCombo_.append("By directory structure");
     styleCombo_.set_active(0);
