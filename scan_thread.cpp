@@ -319,9 +319,21 @@ try
                 }
             }
 			
-			if (sleepTimeMs_ < 5000) // don't sleep more than 5 sec
+			if (sleepTimeMs_ < 300000) // don't sleep more than 5 minutes
 			{
-				sleepTimeMs_ += sleepMs; // next time will wait longer
+			    // next iteration will wait longer
+			    if (sleepTimeMs_ < 10000)
+			    {
+				    sleepTimeMs_ += sleepMs;
+				}
+				else if (sleepTimeMs_ < 60000)
+			    {
+				    sleepTimeMs_ += 10*sleepMs;
+				}
+				else
+			    {
+				    sleepTimeMs_ += 60*sleepMs;
+				}
             }
 		}
 		else
