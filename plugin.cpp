@@ -259,7 +259,7 @@ try
 	pScanThread_.reset(new ScanThread(
 						settings_, 
 						getSupportedExtensions(), 
-						std::move(db_),
+						*db_,
 						eventQueue_,
                         pMainWidget_->getOnChangedDisp(),
                         pMainWidget_->getActiveRecords()));

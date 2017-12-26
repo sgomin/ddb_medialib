@@ -9,7 +9,7 @@
 ScanThread::ScanThread(
 		const SettingsProvider& settings,
 		const Extensions& extensions,
-		DbOwnerPtr&& db,
+		DbOwner& db,
 		ScanEventSink eventSink,
         Glib::Dispatcher& onChangedDisp,
         ActiveRecordsSync& activeFiles)
@@ -18,7 +18,7 @@ ScanThread::ScanThread(
  , continue_(false)
  , settings_(settings)
  , extensions_(extensions)
- , db_(std::move(db))
+ , db_(db)
  , eventSink_(eventSink)
  , onChangedDisp_(onChangedDisp)
  , activeFiles_(activeFiles)
@@ -90,7 +90,7 @@ ScanThread::Changes ScanThread::scanDir(
 		return result;
 	}
 	
-    auto oldRecords = db_->childrenFiles(dirId);
+    auto oldRecords = db_.childrenFiles(dirId);
     
 	std::sort(oldRecords.begin(), oldRecords.end(), CmpByPath());
 		
@@ -388,7 +388,7 @@ ScanThread::Changes ScanThread::scanDirs()
             break;
         }
         
-        auto dir = db_->getFile(dirId);
+        auto dir = db_.getFile(dirId);
         changes += checkDir(make_Record(dirId, std::move(dir)));
     }
     
@@ -403,18 +403,18 @@ bool ScanThread::save(Changes&& changes)
         return false;
     }
     
-    db_->beginTransaction();
+    db_.beginTransaction();
     bool succeed = false;
     
     BOOST_SCOPE_EXIT(&db_, &succeed)
     {
         if (succeed)
         {
-            db_->commit();
+            db_.commit();
         }
         else
         {
-            db_->rollback();
+            db_.rollback();
         }
     } BOOST_SCOPE_EXIT_END
     
@@ -422,7 +422,7 @@ bool ScanThread::save(Changes&& changes)
     {
         if (shouldBreak()) break;
         
-        RecordID id = db_->addFile(std::move(data));
+        RecordID id = db_.addFile(std::move(data));
         eventSink_.push(ScanEvent{ ScanEvent::ADDED, id });
     }
     
@@ -430,7 +430,7 @@ bool ScanThread::save(Changes&& changes)
     {
         if (shouldBreak()) break;
         
-        db_->replaceFile(record.first, std::move(record.second));
+        db_.replaceFile(record.first, std::move(record.second));
         eventSink_.push(ScanEvent{ ScanEvent::UPDATED, record.first });
     }
     
@@ -438,7 +438,7 @@ bool ScanThread::save(Changes&& changes)
     {
         if (shouldBreak()) break;
         
-        db_->delFile(id);
+        db_.delFile(id);
     	eventSink_.push(ScanEvent{ ScanEvent::DELETED, id });
     }
     

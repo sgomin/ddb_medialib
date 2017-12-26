@@ -32,7 +32,7 @@ class ScanThread
 public:
     ScanThread(const SettingsProvider& settings,
                const Extensions& extensions,
-               DbOwnerPtr&& db,
+               DbOwner & db,
                ScanEventSink eventSink,
                Glib::Dispatcher& onChangedDisp,
                ActiveRecordsSync& activeFiles);
@@ -79,15 +79,15 @@ private:
     
     void onActiveFilesChanged();
     
-    std::thread			thread_;
+    std::thread                 thread_;
     std::condition_variable_any	cond_;
-    std::atomic<bool>		stop_;
-    std::atomic<bool>		restart_;
-    std::atomic<bool>		continue_;
-    const SettingsProvider&	settings_;
-    const Extensions		extensions_;
-    DbOwnerPtr                  db_;
-    ScanEventSink		eventSink_;
+    std::atomic<bool>           stop_;
+    std::atomic<bool>           restart_;
+    std::atomic<bool>           continue_;
+    const SettingsProvider&     settings_;
+    const Extensions            extensions_;
+    DbOwner&                    db_;
+    ScanEventSink               eventSink_;
     Glib::Dispatcher&           onChangedDisp_;
     ActiveRecordsSync&          activeFiles_;
 };
