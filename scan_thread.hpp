@@ -76,16 +76,15 @@ private:
     Changes scanDirs();
     bool save(Changes&& changes);
     
-	std::thread					thread_;
-	std::condition_variable_any	cond_;
-	std::atomic<bool>			stop_;
-	std::atomic<bool>			restart_;
-    const SettingsProvider&		settings_;
-    const Extensions			extensions_;
+    std::thread			thread_;
+    std::condition_variable_any	cond_;
+    std::atomic<bool>		stop_;
+    std::atomic<bool>		restart_;
+    const SettingsProvider&	settings_;
+    const Extensions		extensions_;
     DbOwnerPtr                  db_;
-	ScanEventSink				eventSink_;
+    ScanEventSink		eventSink_;
     Glib::Dispatcher&           onChangedDisp_;
-	int                     	sleepTimeMs_ = 500;
 };
 
 #endif	/* SCAN_THREAD_HPP */

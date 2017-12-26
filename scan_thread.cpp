@@ -297,6 +297,10 @@ try
 		
         auto changed = save(scanDirs());
         
+        constexpr static int sleepMs = 500;
+        constexpr static int maxSleepMs = 300000; 
+        static int           sleepTimeMs = sleepMs;
+        
 		if (!changed && !stop_)
 		{
 			struct FackeLock 
@@ -305,9 +309,11 @@ try
 				void unlock() {}
 			} fackeLock;
 			
-            constexpr int sleepMs = 500;
+                       
             
-            for (int i = 0; i < sleepTimeMs_; i += sleepMs)
+            std::clog << "[Scan] Pause for " << sleepTimeMs << " msec" << std::endl;
+            
+            for (int i = 0; i < sleepTimeMs; i += sleepMs)
             {
                 cond_.wait_for(fackeLock, std::chrono::milliseconds(sleepMs));
                 
@@ -319,26 +325,16 @@ try
                 }
             }
 			
-			if (sleepTimeMs_ < 300000) // don't sleep more than 5 minutes
+			if (sleepTimeMs < maxSleepMs) // don't sleep more than 5 minutes
 			{
-			    // next iteration will wait longer
-			    if (sleepTimeMs_ < 10000)
-			    {
-				    sleepTimeMs_ += sleepMs;
-				}
-				else if (sleepTimeMs_ < 60000)
-			    {
-				    sleepTimeMs_ += 10*sleepMs;
-				}
-				else
-			    {
-				    sleepTimeMs_ += 60*sleepMs;
-				}
+			    // next iteration will wait twice as longer
+                sleepTimeMs *= 2;
+                if (sleepTimeMs > maxSleepMs) sleepTimeMs = maxSleepMs;
             }
 		}
 		else
 		{
-			sleepTimeMs_ = 500;
+			sleepTimeMs = sleepMs;
 			std::this_thread::yield();
 		}
         
