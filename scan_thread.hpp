@@ -31,13 +31,14 @@ class ScanThread
 {
 public:
     ScanThread(const SettingsProvider& settings,
-			   const Extensions& extensions,
+               const Extensions& extensions,
                DbOwnerPtr&& db,
-			   ScanEventSink eventSink,
-               Glib::Dispatcher& onChangedDisp);
+               ScanEventSink eventSink,
+               Glib::Dispatcher& onChangedDisp,
+               ActiveRecordsSync& activeFiles);
     ~ScanThread();
     
-	void restart();
+    void restart();
 	
     void operator() ();
 
@@ -71,20 +72,24 @@ private:
     Changes checkDir(const FileRecord& recDir);
     
     bool shouldBreak() const;
-	bool isSupportedExtension(const fs::path& fileName);
+    bool isSupportedExtension(const fs::path& fileName);
     
     Changes scanDirs();
     bool save(Changes&& changes);
+    
+    void onActiveFilesChanged();
     
     std::thread			thread_;
     std::condition_variable_any	cond_;
     std::atomic<bool>		stop_;
     std::atomic<bool>		restart_;
+    std::atomic<bool>		continue_;
     const SettingsProvider&	settings_;
     const Extensions		extensions_;
     DbOwnerPtr                  db_;
     ScanEventSink		eventSink_;
     Glib::Dispatcher&           onChangedDisp_;
+    ActiveRecordsSync&          activeFiles_;
 };
 
 #endif	/* SCAN_THREAD_HPP */

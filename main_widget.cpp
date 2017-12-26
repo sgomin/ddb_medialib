@@ -70,7 +70,11 @@ void MainWidget::setupTreeView()
 // TODO: support multi-line drag'n'drop 
 //    treeVeiew_.get_selection()->set_mode(Gtk::SELECTION_MULTIPLE);
 	treeVeiew_.signal_row_activated().connect(
-            sigc::mem_fun(*this, &MainWidget::onRowActivated));
+        sigc::mem_fun(*this, &MainWidget::onRowActivated));
+    treeVeiew_.signal_row_expanded().connect(
+        sigc::mem_fun(*this, &MainWidget::onRowExpanded));
+    treeVeiew_.signal_row_collapsed().connect(
+        sigc::mem_fun(*this, &MainWidget::onRowCollapsed));
     
     // Drag'n'drop
     std::vector<Gtk::TargetEntry> targets =
@@ -84,6 +88,7 @@ void MainWidget::setupTreeView()
 
 
 void MainWidget::saveExpandedRows()
+try
 {
     std::ofstream expRowsFile(expandRowsFileName_);
     
@@ -92,6 +97,10 @@ void MainWidget::saveExpandedRows()
     {
         expRowsFile << path.to_string() << std::endl;
     });
+}
+catch(std::exception const& e)
+{
+	std::cerr << "Failed to save expanded rows: " << e.what() << std::endl;
 }
 
 
@@ -355,4 +364,62 @@ try
 catch(std::exception const& e)
 {
 	std::cerr << "Failed to add record: " << e.what() << std::endl;
+}
+
+
+void MainWidget::onRowExpanded(
+    const Gtk::TreeModel::iterator& iter, 
+    const Gtk::TreeModel::Path& path)
+{
+    auto fileId = (*iter)[byDirColumns.fileId];
+    std::clog << "[Widget] onRowExpanded " << fileId << std::endl;
+    
+    auto locked = activeRecords_.synchronize();
+    
+    if (locked->ids.insert(fileId).second && 
+        locked->onChanged)
+    {
+        locked->onChanged();
+    }
+}
+
+
+namespace
+{
+    
+bool processCollapsedChildren(
+    const Gtk::TreeModel::iterator& iter,
+    RecordIDs& expanded)
+{
+    bool changed = false;
+    
+    for (Gtk::TreeModel::Row const& child : iter->children())
+    {
+        auto const childId = child[ byDirColumns.fileId ];
+        changed = expanded.erase(childId) || changed;
+        changed = processCollapsedChildren(child, expanded) || changed;
+    }
+    
+    return changed;
+}
+    
+} // end of anonymous namespace
+
+
+void MainWidget::onRowCollapsed(
+    const Gtk::TreeModel::iterator& iter, 
+    const Gtk::TreeModel::Path& path)
+{
+    auto fileId = (*iter)[ byDirColumns.fileId ];
+    std::clog << "[Widget] onRowCollapsed " << fileId << std::endl;
+    
+    auto locked = activeRecords_.synchronize();
+    bool changed = locked->ids.erase(fileId);
+    
+    changed = processCollapsedChildren(iter, locked->ids) || changed; 
+    
+    if (changed && locked->onChanged)
+    {
+        locked->onChanged();
+    }
 }

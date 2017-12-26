@@ -261,7 +261,8 @@ try
 						getSupportedExtensions(), 
 						std::move(db_),
 						eventQueue_,
-                        pMainWidget_->getOnChangedDisp()));
+                        pMainWidget_->getOnChangedDisp(),
+                        pMainWidget_->getActiveRecords()));
 	
     w->widget = GTK_WIDGET( pMainWidget_->gobj() );
     w->destroy = &destroyWidget;

@@ -23,15 +23,22 @@ public:
             fs::path const& configDir);
 	virtual ~MainWidget() override;
     
-	Glib::Dispatcher& getOnChangedDisp() { return onChangesDisp_; }
+    Glib::Dispatcher& getOnChangedDisp() { return onChangesDisp_; }
+    ActiveRecordsSync & getActiveRecords() { return activeRecords_; }
     void onDisconnect();
     
 private:
 	// signal handlers
     void onSettings();
-	void onRowActivated(
-			const Gtk::TreeModel::Path& path, 
-			Gtk::TreeViewColumn* column);
+    void onRowActivated(
+            const Gtk::TreeModel::Path& path, 
+            Gtk::TreeViewColumn* column);
+    void onRowExpanded(
+            const Gtk::TreeModel::iterator& iter, 
+            const Gtk::TreeModel::Path& path);
+    void onRowCollapsed(
+            const Gtk::TreeModel::iterator& iter, 
+            const Gtk::TreeModel::Path& path);
     void onDragDataGet(
             const Glib::RefPtr<Gdk::DragContext>& context,
             Gtk::SelectionData& selection_data, 
@@ -39,35 +46,35 @@ private:
             guint time);
 	void onChanged();
     
-	
-	// auxiliary functions
-	void fillData(const RecordID& from, const Gtk::TreeModel::Children& to);
+    // auxiliary functions
+    void fillData(const RecordID& from, const Gtk::TreeModel::Children& to);
     void setupTreeView();
-	void fillRow(Gtk::TreeModel::iterator itRow, FileRecord const& rec);
-	void delRec(const RecordID& id);
-	void addRec(const RecordID& id);
-	void onPreDeleteRow(Gtk::TreeModel::Row const& row);
+    void fillRow(Gtk::TreeModel::iterator itRow, FileRecord const& rec);
+    void delRec(const RecordID& id);
+    void addRec(const RecordID& id);
+    void onPreDeleteRow(Gtk::TreeModel::Row const& row);
     void saveExpandedRows();
     void restoreExpandedRows();
     
-	typedef std::unordered_map<
-		RecordID, 
-		Gtk::TreeModel::RowReference, 
-		boost::hash<RecordID>> FileToRowMap;
+    typedef std::unordered_map<
+            RecordID, 
+            Gtk::TreeModel::RowReference, 
+            boost::hash<RecordID>> FileToRowMap;
 	
-	DbReader						db_;
+    DbReader                        db_;
     ScanEventSource                 scanEventSource_;
-    Gtk::VBox						sidebar_;
-	Gtk::HBox						firstRow_;
-	Gtk::ComboBoxText				styleCombo_;
-	Gtk::Button						settingsBtn_;
-	Gtk::ScrolledWindow				scrolledWindow_;
-	Gtk::TreeView					treeVeiew_;
-	Glib::RefPtr<Gtk::TreeStore>	pTreeModel_;
-	FileToRowMap					file2row_;
+    Gtk::VBox                       sidebar_;
+    Gtk::HBox                       firstRow_;
+    Gtk::ComboBoxText               styleCombo_;
+    Gtk::Button                     settingsBtn_;
+    Gtk::ScrolledWindow             scrolledWindow_;
+    Gtk::TreeView                   treeVeiew_;
+    Glib::RefPtr<Gtk::TreeStore>    pTreeModel_;
+    FileToRowMap                    file2row_;
     Glib::Dispatcher                onChangesDisp_;
-	sigc::connection				changeConnection_;
+    sigc::connection                changeConnection_;
     std::string const               expandRowsFileName_;
+    ActiveRecordsSync               activeRecords_;
 };
 
 

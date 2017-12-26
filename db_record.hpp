@@ -4,6 +4,7 @@
 #include <string>
 #include <ctime>
 #include <vector>
+#include <set>
 
 #include <stdint.h>
 
@@ -12,12 +13,13 @@ typedef int64_t RecordID;
 const RecordID NULL_RECORD_ID = 0;
 const RecordID ROOT_RECORD_ID = NULL_RECORD_ID;
 
+using RecordIDs = std::set<RecordID>;
 
 struct FileInfo
 {
     RecordID    parentID;
     std::time_t lastWriteTime;
-	bool		isDir;
+    bool	isDir;
     std::string fileName;
 };
 

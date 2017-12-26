@@ -4,6 +4,7 @@
 #include "database.hpp"
 
 #include <boost/thread/sync_queue.hpp>
+#include <boost/thread/synchronized_value.hpp>
 #include "queue_views.hpp"
 
 struct ScanEvent
@@ -17,6 +18,15 @@ struct ScanEvent
 typedef boost::sync_queue<ScanEvent> ScanEventQueue;
 typedef boost::queue_back_view<ScanEventQueue> ScanEventSink;
 typedef boost::queue_front_view<ScanEventQueue> ScanEventSource;
+
+struct ActiveRecords
+{
+    RecordIDs             ids;
+    std::function<void()> onChanged;
+};
+
+using ActiveRecordsSync = boost::synchronized_value<ActiveRecords>;
+
 
 #endif	/* SCAN_EVENT_HPP */
 

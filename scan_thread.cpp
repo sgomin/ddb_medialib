@@ -11,16 +11,19 @@ ScanThread::ScanThread(
 		const Extensions& extensions,
 		DbOwnerPtr&& db,
 		ScanEventSink eventSink,
-        Glib::Dispatcher& onChangedDisp)
+        Glib::Dispatcher& onChangedDisp,
+        ActiveRecordsSync& activeFiles)
  : stop_(false)
  , restart_(true)
+ , continue_(false)
  , settings_(settings)
  , extensions_(extensions)
  , db_(std::move(db))
  , eventSink_(eventSink)
  , onChangedDisp_(onChangedDisp)
+ , activeFiles_(activeFiles)
 {
-	thread_ = std::thread(std::ref(*this));
+    thread_ = std::thread(std::ref(*this));
 }
     
 ScanThread::~ScanThread()
@@ -33,6 +36,12 @@ ScanThread::~ScanThread()
 void ScanThread::restart()
 {
 	restart_ = true;
+	cond_.notify_all();
+}
+
+void ScanThread::onActiveFilesChanged()
+{
+    continue_ = true;
 	cond_.notify_all();
 }
 
@@ -282,6 +291,8 @@ try
             std::clog << "[Scan] initial scan " << std::endl;
 			auto dirs = settings_.getSettings().directories;
             restart_ = false;
+            activeFiles_->onChanged = std::function<void()>();
+            continue_ = false;
 			           
             try
             {
@@ -293,6 +304,8 @@ try
                 std::cerr << "Error scanning root directories: " 
                     << ex.what() << std::endl;
             }
+            
+            activeFiles_->onChanged = std::bind(&ScanThread::onActiveFilesChanged, this);
 		}
 		
         auto changed = save(scanDirs());
@@ -308,8 +321,6 @@ try
 				void lock() {}
 				void unlock() {}
 			} fackeLock;
-			
-                       
             
             std::clog << "[Scan] Pause for " << sleepTimeMs << " msec" << std::endl;
             
@@ -342,6 +353,8 @@ try
         {
             onChangedDisp_();
         }
+        
+        continue_ = false;
 	}
 	
 	std::clog << "Scanning thread stopped" << std::endl;
@@ -359,22 +372,24 @@ catch(...)
 
 bool ScanThread::shouldBreak() const
 {
-	return stop_ || restart_;
+	return stop_ || restart_ || continue_;
 }
 
 
 ScanThread::Changes ScanThread::scanDirs()
 {
     Changes changes;
+    auto const dirIds = activeFiles_->ids;
     
-    for (auto dir : db_->dirs())
+    for (auto dirId : dirIds)
     {
         if (shouldBreak())
         {
             break;
         }
         
-        changes += checkDir(dir);
+        auto dir = db_->getFile(dirId);
+        changes += checkDir(make_Record(dirId, std::move(dir)));
     }
     
     return changes;
