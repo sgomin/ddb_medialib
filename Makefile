@@ -67,4 +67,4 @@ install: $(PLUGIN_FILENAME)
 	cp -f $(PLUGIN_FILENAME) $(DESTDIR)/usr/lib/deadbeef
 
 clean:
-	$(RM) *.o
+	$(RM) *.o *.so
