@@ -74,7 +74,7 @@ private:
     bool shouldBreak() const;
     bool isSupportedExtension(const fs::path& fileName);
     
-    Changes scanDirs();
+    Changes scanDirs(bool isIdle);
     bool save(Changes&& changes);
     
     void onActiveFilesChanged();

@@ -89,6 +89,8 @@ ScanThread::Changes ScanThread::scanDir(
 	{
 		return result;
 	}
+    
+    std::clog << "[Scan] scanDir #" << dirId << std::endl;
 	
     auto oldRecords = db_.childrenFiles(dirId);
     
@@ -129,6 +131,7 @@ try
     std::clog << "[Scan] scanEntry " << path << std::endl;
 	
 	const bool isDir = fs::is_directory(path);	
+    std::clog << "[Scan] scanEntry " << path << "isDir=" << isDir << std::endl;
 	FileRecord newRecord = make_Record(
 		NULL_RECORD_ID, 
 		FileInfo{ parentID, /*last write time*/0, isDir, path.string() });
@@ -283,6 +286,7 @@ void ScanThread::operator() ()
 try
 {
 	std::clog << "Scanning thread started" << std::endl;
+    bool hasChanged = true;
 	
 	while (!stop_)
 	{
@@ -293,6 +297,7 @@ try
             restart_ = false;
             activeFiles_->onChanged = std::function<void()>();
             continue_ = false;
+            hasChanged = true;
 			           
             try
             {
@@ -308,13 +313,13 @@ try
             activeFiles_->onChanged = std::bind(&ScanThread::onActiveFilesChanged, this);
 		}
 		
-        auto changed = save(scanDirs());
+        hasChanged = save(scanDirs(/*isIdle*/!hasChanged));
         
         constexpr static int sleepMs = 500;
         constexpr static int maxSleepMs = 300000; 
         static int           sleepTimeMs = sleepMs;
         
-		if (!changed && !stop_)
+		if (!hasChanged && !stop_)
 		{
 			struct FackeLock 
 			{
@@ -376,20 +381,38 @@ bool ScanThread::shouldBreak() const
 }
 
 
-ScanThread::Changes ScanThread::scanDirs()
+ScanThread::Changes ScanThread::scanDirs(bool isIdle)
 {
     Changes changes;
-    auto const dirIds = activeFiles_->ids;
     
-    for (auto dirId : dirIds)
+    if (isIdle)
     {
-        if (shouldBreak())
+        auto const dirIds = activeFiles_->ids;
+
+        for (auto dirId : dirIds)
         {
-            break;
+            if (shouldBreak())
+            {
+                break;
+            }
+
+            try
+            {
+                auto dir = db_.getFile(dirId);
+                changes += checkDir(make_Record(dirId, std::move(dir)));
+            }
+            catch(std::out_of_range const& e) // directory not in db already (yet)
+            {
+                std::clog << "[Scan] scanDirs #" << dirId << ": " << e.what() << std::endl;
+            }
         }
-        
-        auto dir = db_.getFile(dirId);
-        changes += checkDir(make_Record(dirId, std::move(dir)));
+    }
+    else
+    {
+        for (auto const& dir : db_.dirs())
+        {
+            changes += checkDir(dir);
+        }
     }
     
     return changes;
