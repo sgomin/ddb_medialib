@@ -340,6 +340,7 @@ void MainWidget::onPreDeleteRow(Gtk::TreeModel::Row const& row)
 	
 	const RecordID& id = row[byDirColumns.fileId];
 	file2row_.erase(id);
+    activeRecords_->ids.erase(id);
 }
 
 
