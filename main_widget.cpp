@@ -21,15 +21,16 @@ MainWidget::MainWidget(
         fs::path const& configDir)
  : db_(std::move(db))
  , scanEventSource_(scanEventSource)
- , settingsBtn_("Settings")
+ , settingsImg_(Gtk::Stock::PROPERTIES, Gtk::ICON_SIZE_BUTTON)
  , expandRowsFileName_((configDir / "expanded_rows").string())
 {
     styleCombo_.append("By directory structure");
     styleCombo_.set_active(0);
     
+    settingsBtn_.set_image(settingsImg_);
 	settingsBtn_.signal_clicked().connect(
             sigc::mem_fun(*this, &MainWidget::onSettings));
-	
+    	
 	firstRow_.pack_start(styleCombo_, Gtk::PACK_EXPAND_WIDGET);
 	firstRow_.pack_end(settingsBtn_, Gtk::PACK_SHRINK);
 	
