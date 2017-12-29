@@ -1,7 +1,6 @@
 #include "settings_dlg.hpp"
 
 #include <vector>
-#include <gtkmm-2.4/gtkmm/stock.h>
 
 
 struct DirListColumns : Gtk::TreeModel::ColumnRecord
