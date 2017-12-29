@@ -14,14 +14,13 @@ private:
     void initDirList();
     void onAddDir();
     void onDelDir();
-//    bool onSelNotify(GdkEventSelection* selection_event);
     
     void addDirectory(
             const std::string & dirname, 
             const Settings::Directory & settings);
     
     Settings                   & settings_;
-    Gtk::TreeView		 dirList_;
+    Gtk::TreeView                dirList_;
     Glib::RefPtr<Gtk::ListStore> pListModel_;
     Gtk::Button                  btnDel_;
 };

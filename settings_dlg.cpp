@@ -1,6 +1,7 @@
 #include "settings_dlg.hpp"
 
 #include <vector>
+#include <gtkmm-2.4/gtkmm/stock.h>
 
 
 struct DirListColumns : Gtk::TreeModel::ColumnRecord
@@ -15,7 +16,7 @@ static const DirListColumns dirListColumns; // TODO: make non-static
 SettingsDlg::SettingsDlg(Settings & settings) :
     Gtk::Dialog("Settings", /*modal*/ true),
     settings_(settings),
-    btnDel_("Delete")
+    btnDel_(Gtk::Stock::DELETE)
 {
     initDirList();
   
@@ -28,8 +29,11 @@ SettingsDlg::SettingsDlg(Settings & settings) :
     Gtk::Frame * pFrame = Gtk::manage(new Gtk::Frame("Media Directories"));
     Gtk::VBox * pRightBox = Gtk::manage(new Gtk::VBox());
     
-    Gtk::Button * pBtnAdd = Gtk::manage(new Gtk::Button("Add"));
-    
+    Gtk::Button * pBtnAdd = Gtk::manage(new Gtk::Button(Gtk::Stock::ADD));
+#ifndef USE_GTK2
+    pBtnAdd->set_always_show_image();
+    btnDel_.set_always_show_image();
+#endif   
     pBtnAdd->signal_clicked().connect(sigc::mem_fun(*this, &SettingsDlg::onAddDir));
     btnDel_.signal_clicked().connect(sigc::mem_fun(*this, &SettingsDlg::onDelDir));
     
@@ -110,12 +114,8 @@ void SettingsDlg::onDelDir()
         show_all();
     }
 }
-/*
-bool SettingsDlg::onSelNotify(GdkEventSelection* selection_event)
-{
-    btnDel_.set_sensitive(true);
-}
-*/
+
+
 void SettingsDlg::addDirectory(
 	const std::string & dirname, 
     const Settings::Directory & /*settings*/)
