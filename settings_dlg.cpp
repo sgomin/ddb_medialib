@@ -29,10 +29,6 @@ SettingsDlg::SettingsDlg(Settings & settings) :
     Gtk::VBox * pRightBox = Gtk::manage(new Gtk::VBox());
     
     Gtk::Button * pBtnAdd = Gtk::manage(new Gtk::Button(Gtk::Stock::ADD));
-#ifndef USE_GTK2
-    pBtnAdd->set_always_show_image();
-    btnDel_.set_always_show_image();
-#endif   
     pBtnAdd->signal_clicked().connect(sigc::mem_fun(*this, &SettingsDlg::onAddDir));
     btnDel_.signal_clicked().connect(sigc::mem_fun(*this, &SettingsDlg::onDelDir));
     
