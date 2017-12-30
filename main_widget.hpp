@@ -30,6 +30,7 @@ public:
 private:
 	// signal handlers
     void onSettings();
+    void onRefresh();
     void onRowActivated(
             const Gtk::TreeModel::Path& path, 
             Gtk::TreeViewColumn* column);
@@ -63,12 +64,6 @@ private:
 	
     DbReader                        db_;
     ScanEventSource                 scanEventSource_;
-    Gtk::VBox                       sidebar_;
-    Gtk::HBox                       firstRow_;
-    Gtk::ComboBoxText               styleCombo_;
-    Gtk::Image                      settingsImg_;
-    Gtk::Button                     settingsBtn_;
-    Gtk::ScrolledWindow             scrolledWindow_;
     Gtk::TreeView                   treeVeiew_;
     Glib::RefPtr<Gtk::TreeStore>    pTreeModel_;
     FileToRowMap                    file2row_;

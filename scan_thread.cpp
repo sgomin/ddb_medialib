@@ -6,6 +6,8 @@
 
 #include <thread>
 
+namespace pl = std::placeholders;
+
 ScanThread::ScanThread(
 		const SettingsProvider& settings,
 		const Extensions& extensions,
@@ -39,10 +41,17 @@ void ScanThread::restart()
 	cond_.notify_all();
 }
 
-void ScanThread::onActiveFilesChanged()
+void ScanThread::onActiveFilesChanged(bool rest)
 {
-    continue_ = true;
-	cond_.notify_all();
+    if (rest)
+    {
+        restart();
+    }
+    else
+    {
+        continue_ = true;
+        cond_.notify_all();
+    }
 }
 
 namespace {
@@ -295,7 +304,7 @@ try
             std::clog << "[Scan] initial scan " << std::endl;
 			auto dirs = settings_.getSettings().directories;
             restart_ = false;
-            activeFiles_->onChanged = std::function<void()>();
+            activeFiles_->onChanged = ActiveRecords::OnChanged();
             continue_ = false;
             hasChanged = true;
 			           
@@ -310,7 +319,8 @@ try
                     << ex.what() << std::endl;
             }
             
-            activeFiles_->onChanged = std::bind(&ScanThread::onActiveFilesChanged, this);
+            activeFiles_->onChanged = 
+                    std::bind(&ScanThread::onActiveFilesChanged, this, pl::_1);
 		}
 		
         hasChanged = save(scanDirs(/*isIdle*/!hasChanged));

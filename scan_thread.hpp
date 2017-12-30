@@ -77,7 +77,7 @@ private:
     Changes scanDirs(bool isIdle);
     bool save(Changes&& changes);
     
-    void onActiveFilesChanged();
+    void onActiveFilesChanged(bool restart);
     
     std::thread                 thread_;
     std::condition_variable_any	cond_;

@@ -21,8 +21,10 @@ typedef boost::queue_front_view<ScanEventQueue> ScanEventSource;
 
 struct ActiveRecords
 {
-    RecordIDs             ids;
-    std::function<void()> onChanged;
+    using OnChanged = std::function<void(/*restart*/bool)>;
+    
+    RecordIDs ids;
+    OnChanged onChanged;
 };
 
 using ActiveRecordsSync = boost::synchronized_value<ActiveRecords>;

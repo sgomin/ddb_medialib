@@ -12,7 +12,7 @@ struct ByDirectoryColumns : Gtk::TreeModel::ColumnRecord
 	ByDirectoryColumns() { add(fileId); add(filename); }
 };
 
-static const ByDirectoryColumns byDirColumns;
+static const ByDirectoryColumns byDirColumns; // TODO: make non-static
 
 
 MainWidget::MainWidget(
@@ -21,18 +21,34 @@ MainWidget::MainWidget(
         fs::path const& configDir)
  : db_(std::move(db))
  , scanEventSource_(scanEventSource)
- , settingsImg_(Gtk::Stock::PROPERTIES, Gtk::ICON_SIZE_BUTTON)
  , expandRowsFileName_((configDir / "expanded_rows").string())
 {
-    styleCombo_.append("By directory structure");
-    styleCombo_.set_active(0);
+    // "mode" combo
+    auto pModeCombo = Gtk::manage(new Gtk::ComboBoxText());
+    pModeCombo->append("By directory structure");
+    pModeCombo->set_active(0);
     
-    settingsBtn_.set_image(settingsImg_);
-	settingsBtn_.signal_clicked().connect(
+    // button "Refresh"
+    auto pRefreshImg = Gtk::manage(
+        new Gtk::Image(Gtk::Stock::REFRESH, Gtk::ICON_SIZE_BUTTON));
+    auto pBtnRefresh = Gtk::manage(new Gtk::Button());
+    pBtnRefresh->set_image(*pRefreshImg);
+	pBtnRefresh->signal_clicked().connect(
+            sigc::mem_fun(*this, &MainWidget::onRefresh));
+    
+    // button "Properties"
+    auto pSettingsImg = Gtk::manage(
+            new Gtk::Image(Gtk::Stock::PROPERTIES, Gtk::ICON_SIZE_BUTTON));
+    auto pBtnSettings = Gtk::manage(new Gtk::Button());
+    pBtnSettings->set_image(*pSettingsImg);
+	pBtnSettings->signal_clicked().connect(
             sigc::mem_fun(*this, &MainWidget::onSettings));
-    	
-	firstRow_.pack_start(styleCombo_, Gtk::PACK_EXPAND_WIDGET);
-	firstRow_.pack_end(settingsBtn_, Gtk::PACK_SHRINK);
+    
+    // row with "mode" combo, "refresh" and "properties" buttons
+    auto pPirstRow = Gtk::manage(new Gtk::HBox());
+	pPirstRow->pack_start(*pModeCombo, Gtk::PACK_EXPAND_WIDGET);
+    pPirstRow->pack_end(*pBtnSettings, Gtk::PACK_SHRINK);
+    pPirstRow->pack_end(*pBtnRefresh, Gtk::PACK_SHRINK);
 	
 	pTreeModel_ = Gtk::TreeStore::create(byDirColumns);
 	pTreeModel_->set_sort_column(byDirColumns.filename, Gtk::SORT_ASCENDING);
@@ -42,12 +58,16 @@ MainWidget::MainWidget(
 	fillData(ROOT_RECORD_ID, pTreeModel_->children());
 	setupTreeView();
     
-	scrolledWindow_.set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);
-    scrolledWindow_.add(treeVeiew_);
+    // main window containing the tree view
+    auto pScrolledWindow = Gtk::manage(new Gtk::ScrolledWindow());
+	pScrolledWindow->set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);
+    pScrolledWindow->add(treeVeiew_);
     
-	sidebar_.pack_start(firstRow_, Gtk::PACK_SHRINK);
-	sidebar_.pack_start(scrolledWindow_, Gtk::PACK_EXPAND_WIDGET);
-    add(sidebar_);
+    // entire plugin widget
+    auto pSideBar = Gtk::manage(new Gtk::VBox());
+	pSideBar->pack_start(*pPirstRow, Gtk::PACK_SHRINK);
+	pSideBar->pack_start(*pScrolledWindow, Gtk::PACK_EXPAND_WIDGET);
+    add(*pSideBar);
     restoreExpandedRows();
     show_all();
 	
@@ -381,7 +401,7 @@ void MainWidget::onRowExpanded(
     if (locked->ids.insert(fileId).second && 
         locked->onChanged)
     {
-        locked->onChanged();
+        locked->onChanged(/*restart*/false);
     }
 }
 
@@ -422,6 +442,16 @@ void MainWidget::onRowCollapsed(
     
     if (changed && locked->onChanged)
     {
-        locked->onChanged();
+        locked->onChanged(/*restart*/false);
+    }
+}
+
+void MainWidget::onRefresh()
+{
+    auto locked = activeRecords_.synchronize();
+    
+    if (locked->onChanged)
+    {
+        locked->onChanged(/*restart*/true);
     }
 }
