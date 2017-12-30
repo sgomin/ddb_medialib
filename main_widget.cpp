@@ -25,6 +25,7 @@ MainWidget::MainWidget(
 {
     // "mode" combo
     auto pModeCombo = Gtk::manage(new Gtk::ComboBoxText());
+    pModeCombo->set_tooltip_text("Display mode");
     pModeCombo->append("By directory structure");
     pModeCombo->set_active(0);
     
@@ -33,6 +34,7 @@ MainWidget::MainWidget(
         new Gtk::Image(Gtk::Stock::REFRESH, Gtk::ICON_SIZE_BUTTON));
     auto pBtnRefresh = Gtk::manage(new Gtk::Button());
     pBtnRefresh->set_image(*pRefreshImg);
+    pBtnRefresh->set_tooltip_text("Refresh");
 	pBtnRefresh->signal_clicked().connect(
             sigc::mem_fun(*this, &MainWidget::onRefresh));
     
@@ -41,6 +43,7 @@ MainWidget::MainWidget(
             new Gtk::Image(Gtk::Stock::PROPERTIES, Gtk::ICON_SIZE_BUTTON));
     auto pBtnSettings = Gtk::manage(new Gtk::Button());
     pBtnSettings->set_image(*pSettingsImg);
+    pBtnSettings->set_tooltip_text("Properties");
 	pBtnSettings->signal_clicked().connect(
             sigc::mem_fun(*this, &MainWidget::onSettings));
     

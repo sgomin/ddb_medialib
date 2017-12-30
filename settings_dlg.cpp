@@ -29,7 +29,9 @@ SettingsDlg::SettingsDlg(Settings & settings) :
     Gtk::VBox * pRightBox = Gtk::manage(new Gtk::VBox());
     
     Gtk::Button * pBtnAdd = Gtk::manage(new Gtk::Button(Gtk::Stock::ADD));
+    pBtnAdd->set_use_underline();
     pBtnAdd->signal_clicked().connect(sigc::mem_fun(*this, &SettingsDlg::onAddDir));
+    btnDel_.set_use_underline();
     btnDel_.signal_clicked().connect(sigc::mem_fun(*this, &SettingsDlg::onDelDir));
     
     //    btnDel_.set_sensitive(false);
