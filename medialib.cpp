@@ -8,10 +8,6 @@
 
 DB_functions_t * deadbeef = nullptr;
 
-static const char settings_dlg[] = 
-    "property \"Enable plugin\"                 checkbox "              CONFSTR_MEDIALIB_ENABLED              " 1 ;\n"
-    "property \"Default path: \"                file "                 CONFSTR_MEDIALIB_ROOTPATH         " \" ~\\home\\Music \" ;\n";
-
 extern "C" DB_plugin_t *
 #ifdef USE_GTK2
     ddb_misc_medialib_gtk2_load
@@ -49,7 +45,7 @@ extern "C" DB_plugin_t *
     plugin.stop            = &Plugin::stop;
     plugin.connect         = &Plugin::connect;
     plugin.disconnect      = &Plugin::disconnect;
-    plugin.configdialog    = settings_dlg;
+    plugin.configdialog    = nullptr;
     
     return &plugin;
 }
