@@ -1,6 +1,7 @@
 GTKMM_VER=3.0
 PLUGIN_NAME=ddb_misc_medialib
 PLUGIN_FILENAME=$(PLUGIN_NAME)_gtk3.so
+ARCH=$(shell uname -m)
 
 ifdef GTK2
     GTKMM_VER=2.4
@@ -63,8 +64,14 @@ local_install: $(PLUGIN_FILENAME)
 	cp -f $(PLUGIN_FILENAME) $$HOME/.local/lib/deadbeef
 
 install: $(PLUGIN_FILENAME)
-	mkdir -p $(DESTDIR)/usr/lib/deadbeef
-	cp -f $(PLUGIN_FILENAME) $(DESTDIR)/usr/lib/deadbeef
+	if [ -d $(DESTDIR)/usr/lib/$(ARCH)-linux-gnu ] ;			\
+	then									\
+	    mkdir -p $(DESTDIR)/usr/lib/$(ARCH)-linux-gnu/deadbeef;		\
+	    cp -f $(PLUGIN_FILENAME) $(DESTDIR)/usr/lib/$(ARCH)-linux-gnu/deadbeef; \
+	else									\
+	    mkdir -p $(DESTDIR)/usr/lib/deadbeef;				\
+	    cp -f $(PLUGIN_FILENAME) $(DESTDIR)/usr/lib/deadbeef;		\
+	fi									\
 
 clean:
 	$(RM) *.o *.so
