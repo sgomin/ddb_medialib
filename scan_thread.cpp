@@ -5,6 +5,7 @@
 #include <boost/scope_exit.hpp>
 
 #include <thread>
+#include <iostream>
 
 namespace pl = std::placeholders;
 

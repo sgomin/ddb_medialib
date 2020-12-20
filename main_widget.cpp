@@ -4,6 +4,7 @@
 #include "medialib.h"
 
 #include <fstream>
+#include <iostream>
 
 struct ByDirectoryColumns : Gtk::TreeModel::ColumnRecord
 {
