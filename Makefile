@@ -8,8 +8,8 @@ ifdef GTK2
     PLUGIN_FILENAME=$(PLUGIN_NAME)_gtk2.so
 endif
 
-CCFLAGS = -fPIC
-CXXFLAGS += -std=c++11 -fPIC $$(pkg-config --cflags gtkmm-$(GTKMM_VER))
+CCFLAGS = -fPIC -pipe
+CXXFLAGS += -std=c++11 -fPIC -pipe $$(pkg-config --cflags gtkmm-$(GTKMM_VER))
 LIBS += $$(pkg-config --libs gtkmm-$(GTKMM_VER)) -lboost_system -lboost_exception -lboost_thread -lboost_filesystem
 
 SQLITE_FLAGS = -D_HAVE_SQLITE_CONFIG_H
@@ -18,8 +18,8 @@ ifdef DEBUG
     CXXFLAGS += -DDEBUG -ggdb3 -Wall
     CCFLAGS += -DDEBUG -ggdb3 -Wall
 else
-    CXXFLAGS += -DNDEBUG -O3
-    CCFLAGS += -DNDEBUG -O3
+    CXXFLAGS += -DNDEBUG -O3 -fomit-frame-pointer
+    CCFLAGS += -DNDEBUG -O3 -fomit-frame-pointer
 endif
 
 ifdef GTK2
@@ -57,7 +57,7 @@ settings_dlg.o: settings_dlg.cpp settings_dlg.hpp
 settings.o: settings.cpp settings.hpp
 	$(CXX) $(CXXFLAGS) -c settings.cpp
 
-all: ddb_misc_medialib.so
+all: $(PLUGIN_FILENAME)
 
 local_install: $(PLUGIN_FILENAME)
 	mkdir -p $$HOME/.local/lib/deadbeef
