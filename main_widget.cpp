@@ -295,7 +295,7 @@ try
         {
             FileInfo const rec = db_.getFile((*itRow)[byDirColumns.fileId]);
 
-            if (uris.empty())
+            if (!uris.empty())
             {
                 uris += ' ';
             }
