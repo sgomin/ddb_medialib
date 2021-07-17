@@ -6,10 +6,7 @@ Media library plugin for Deadbeef music player
 
 - libgtkmm-3.0-dev / libgtkmm-2.4-dev
 - libboost-dev
-- libboost-system-dev
 - libboost-thread-dev
-- libboost-exception-dev
-- libboost-filesystem-dev
 
 ## Building
 

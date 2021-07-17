@@ -319,7 +319,7 @@ FileRecords DbReader::dirs() const
 }
 
 
-boost::optional<FileRecord> DbReader::readNextRecord(sqlite3_stmt* pStmt)
+std::optional<FileRecord> DbReader::readNextRecord(sqlite3_stmt* pStmt)
 {
     assert(pStmt);
     
@@ -328,7 +328,7 @@ boost::optional<FileRecord> DbReader::readNextRecord(sqlite3_stmt* pStmt)
     if (res == SQLITE_DONE)
     {
         CHECK_SQLITE(sqlite3_reset(pStmt));
-        return boost::none;
+        return std::nullopt;
     }
     else if (res != SQLITE_ROW)
     {

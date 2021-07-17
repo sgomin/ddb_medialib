@@ -5,8 +5,6 @@
 #include "database.hpp"
 #include "scan_event.hpp"
 
-#include <boost/functional/hash.hpp>
-
 #include <filesystem>
 namespace fs = std::filesystem;
 #include <unordered_map>
@@ -59,8 +57,7 @@ private:
     
     typedef std::unordered_map<
             RecordID, 
-            Gtk::TreeModel::RowReference, 
-            boost::hash<RecordID>> FileToRowMap;
+            Gtk::TreeModel::RowReference> FileToRowMap;
 	
     DbReader                        db_;
     ScanEventSource                 scanEventSource_;

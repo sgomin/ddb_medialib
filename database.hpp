@@ -3,13 +3,11 @@
 
 #include "db_record.hpp"
 
-#include <boost/noncopyable.hpp>
-#include <boost/optional.hpp>
-
 #include <string>
 #include <memory>
 #include <stdexcept>
 #include <unordered_map>
+#include <optional>
 
 struct sqlite3;
 struct sqlite3_stmt;
@@ -49,17 +47,19 @@ protected:
     DbReader(sqlite3* pDb);
     
     void close();
-    static boost::optional<FileRecord> readNextRecord(sqlite3_stmt* pStmt);
+    static std::optional<FileRecord> readNextRecord(sqlite3_stmt* pStmt);
     
     sqlite3*                pDb_;
     mutable StatementCache  statements_;
 };
 
 
-class DbOwner : public DbReader, private boost::noncopyable
+class DbOwner : public DbReader
 {
 public:
     explicit DbOwner(const std::string& fileName);
+
+    DbOwner(const DbOwner&) = delete;
     
     RecordID    addFile(const FileInfo& record);
     void        delFile(RecordID id);

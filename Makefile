@@ -10,7 +10,7 @@ endif
 
 CCFLAGS = -fPIC -pipe
 CXXFLAGS += -std=c++17 -fPIC -pipe $$(pkg-config --cflags gtkmm-$(GTKMM_VER))
-LIBS += $$(pkg-config --libs gtkmm-$(GTKMM_VER)) -lboost_exception -lboost_thread
+LIBS += $$(pkg-config --libs gtkmm-$(GTKMM_VER)) -lboost_thread
 
 SQLITE_FLAGS = -D_HAVE_SQLITE_CONFIG_H
 

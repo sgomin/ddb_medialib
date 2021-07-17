@@ -1,7 +1,6 @@
 #include "scan_thread.hpp"
 #include "database.hpp"
 
-#include <boost/range.hpp>
 #include <boost/scope_exit.hpp>
 
 #include <thread>
@@ -251,9 +250,7 @@ try
             result.replaceEntry(make_Record(recDir.first, std::move(newData)));
             
             std::clog << recDir.second.fileName << " changed, scanning" << std::endl;
-            result += scanDir(recDir.first, 
-                    boost::make_iterator_range(
-                        fs::directory_iterator(dirPath), fs::directory_iterator()));
+            result += scanDir(recDir.first, fs::directory_iterator(dirPath));
         }
     }
     else
