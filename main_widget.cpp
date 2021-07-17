@@ -265,7 +265,7 @@ try
 					<< "' to playlist" << std::endl;
 		}
 	}
-	else if (fs::is_regular(rec.fileName.c_str()))
+	else if (fs::is_regular_file(rec.fileName.c_str()))
 	{
 		if (deadbeef->plt_add_file2 (0, plt, rec.fileName.c_str(), NULL, NULL) < 0)
         {

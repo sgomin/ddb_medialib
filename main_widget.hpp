@@ -6,9 +6,9 @@
 #include "scan_event.hpp"
 
 #include <boost/functional/hash.hpp>
-#include <boost/filesystem.hpp>
-namespace fs = boost::filesystem;
 
+#include <filesystem>
+namespace fs = std::filesystem;
 #include <unordered_map>
 
 #include <gtkmm.h>

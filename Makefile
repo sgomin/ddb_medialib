@@ -9,8 +9,8 @@ ifdef GTK2
 endif
 
 CCFLAGS = -fPIC -pipe
-CXXFLAGS += -std=c++11 -fPIC -pipe $$(pkg-config --cflags gtkmm-$(GTKMM_VER))
-LIBS += $$(pkg-config --libs gtkmm-$(GTKMM_VER)) -lboost_system -lboost_exception -lboost_thread -lboost_filesystem
+CXXFLAGS += -std=c++17 -fPIC -pipe $$(pkg-config --cflags gtkmm-$(GTKMM_VER))
+LIBS += $$(pkg-config --libs gtkmm-$(GTKMM_VER)) -lboost_exception -lboost_thread
 
 SQLITE_FLAGS = -D_HAVE_SQLITE_CONFIG_H
 

@@ -85,6 +85,11 @@ struct CmpByPath
 	}
 };
 
+time_t getLastWriteTime(const fs::path& path)
+{
+    return fs::last_write_time(path).time_since_epoch().count();
+}
+
 }
 
 
@@ -168,7 +173,7 @@ try
 			return result; // unsupported extension
 		}
 				
-        newRecord.second.lastWriteTime = fs::last_write_time(path);
+        newRecord.second.lastWriteTime = getLastWriteTime(path);
         
 		if (itOldRecord == oldRecords.end())
 		{
@@ -236,7 +241,7 @@ try
             
     if(fs::is_directory(dirPath))
     {              
-        time_t const lastWriteTime = fs::last_write_time(dirPath);
+        time_t const lastWriteTime = getLastWriteTime(dirPath);
 
         if(lastWriteTime != recDir.second.lastWriteTime)
         {

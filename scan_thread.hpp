@@ -5,10 +5,10 @@
 #include "database.hpp"
 #include "scan_event.hpp"
 
-#include <boost/filesystem.hpp>
-namespace fs = boost::filesystem;
 #include <boost/algorithm/string/predicate.hpp>
 
+#include <filesystem>
+namespace fs = std::filesystem;
 #include <set>
 #include <string>
 #include <atomic>
